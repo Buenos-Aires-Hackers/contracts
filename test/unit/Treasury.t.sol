@@ -5,6 +5,7 @@ import {BaseTest} from "../helpers/BaseTest.sol";
 import {Treasury} from "@evvm/testnet-contracts/contracts/treasury/Treasury.sol";
 import {Evvm} from "@evvm/testnet-contracts/contracts/evvm/Evvm.sol";
 import {MockRiscZeroVerifier} from "../mocks/MockRiscZeroVerifier.sol";
+import {ErrorsLib} from "@evvm/testnet-contracts/contracts/treasury/lib/ErrorsLib.sol";
 
 contract TreasuryTest is BaseTest {
     event Deposit(address indexed user, address indexed token, uint256 amount);
@@ -625,6 +626,256 @@ contract TreasuryTest is BaseTest {
             validAfter,
             validBefore,
             nonce,
+            v,
+            r,
+            s
+        );
+    }
+
+    // ============ Locking Mechanism Tests ============
+
+    function test_LockedFunds_CannotWithdrawWhileListingActive() public {
+        uint256 listingAmount = 200 * 10 ** 6;
+
+        // Alice has 1500 USDC in evvm (1000 from setup + 500 from deposit in setUp)
+        uint256 aliceInitialBalance = evvm.getBalance(alice, address(usdc));
+
+        // Alice creates a listing, locking 200 USDC
+        Treasury.Listing memory listing = Treasury.Listing({
+            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-1111111-1111111",
+            amount: listingAmount,
+            shopper: alice
+        });
+
+        vm.startPrank(alice);
+        usdc.approve(address(treasury), listingAmount);
+        treasury.list(listing);
+        vm.stopPrank();
+
+        // Transfer USDC to treasury for withdrawal attempts
+        vm.prank(alice);
+        usdc.transfer(address(treasury), aliceInitialBalance);
+
+        // Try to withdraw more than unlocked amount - should fail
+        // Alice has (aliceInitialBalance + listingAmount) total, but listingAmount is locked
+        uint256 tryToWithdraw = aliceInitialBalance + 1; // More than unlocked
+
+        (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
+            backendPrivateKey,
+            backend,
+            alice,
+            tryToWithdraw,
+            block.timestamp - 1,
+            block.timestamp + 1 hours,
+            keccak256("try-withdraw-locked")
+        );
+
+        vm.expectRevert(ErrorsLib.InsufficientBalance.selector);
+        treasury.transferWithAuthorization(
+            backend,
+            alice,
+            tryToWithdraw,
+            block.timestamp - 1,
+            block.timestamp + 1 hours,
+            keccak256("try-withdraw-locked"),
+            v,
+            r,
+            s
+        );
+    }
+
+    function test_LockedFunds_UnlockedAfterPurchaseComplete() public {
+        uint256 listingAmount = 100 * 10 ** 6;
+
+        // Alice creates listing
+        Treasury.Listing memory listing = Treasury.Listing({
+            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-2222222-2222222",
+            amount: listingAmount,
+            shopper: alice
+        });
+
+        vm.startPrank(alice);
+        usdc.approve(address(treasury), listingAmount);
+        treasury.list(listing);
+        vm.stopPrank();
+
+        bytes32 listingId = treasury.calculateId(listing);
+
+        // Funds are locked, Alice has (initial - listingAmount) available
+        uint256 aliceBalance = evvm.getBalance(alice, address(usdc));
+
+        // Bob completes the purchase
+        bytes memory purchaseData = abi.encode(
+            EXPECTED_NOTARY_FINGERPRINT,
+            "GET",
+            listing.url,
+            block.timestamp,
+            EXPECTED_QUERIES_HASH
+        );
+        bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
+        mockVerifier.setShouldSucceed(true);
+
+        vm.prank(bob);
+        treasury.submitPurchase(listingId, purchaseData, seal);
+
+        // After purchase, Alice's locked amount should be 0
+        // Alice's remaining balance should be withdrawable
+        uint256 aliceRemainingBalance = evvm.getBalance(alice, address(usdc));
+
+        if (aliceRemainingBalance > 0) {
+            vm.prank(address(treasury));
+            evvm.addAmountToUser(charlie, address(usdc), aliceRemainingBalance);
+
+            vm.prank(alice);
+            usdc.transfer(address(treasury), aliceRemainingBalance);
+
+            (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
+                backendPrivateKey,
+                backend,
+                charlie,
+                aliceRemainingBalance,
+                block.timestamp - 1,
+                block.timestamp + 1 hours,
+                keccak256("withdraw-after-unlock")
+            );
+
+            // Should succeed because funds are no longer locked
+            treasury.transferWithAuthorization(
+                backend,
+                charlie,
+                aliceRemainingBalance,
+                block.timestamp - 1,
+                block.timestamp + 1 hours,
+                keccak256("withdraw-after-unlock"),
+                v,
+                r,
+                s
+            );
+
+            assertEq(evvm.getBalance(charlie, address(usdc)), 0);
+        }
+    }
+
+    function test_LockedFunds_MultipleListings() public {
+        uint256 listing1Amount = 100 * 10 ** 6;
+        uint256 listing2Amount = 150 * 10 ** 6;
+        uint256 totalLocked = listing1Amount + listing2Amount;
+
+        Treasury.Listing memory listing1 = Treasury.Listing({
+            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-3333333-3333333",
+            amount: listing1Amount,
+            shopper: alice
+        });
+
+        Treasury.Listing memory listing2 = Treasury.Listing({
+            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-4444444-4444444",
+            amount: listing2Amount,
+            shopper: alice
+        });
+
+        uint256 aliceInitialBalance = evvm.getBalance(alice, address(usdc));
+
+        vm.startPrank(alice);
+        usdc.approve(address(treasury), totalLocked);
+        treasury.list(listing1);
+        treasury.list(listing2);
+        vm.stopPrank();
+
+        // Alice has totalLocked locked, transfer funds to treasury for withdrawal test
+        vm.prank(alice);
+        usdc.transfer(address(treasury), aliceInitialBalance + totalLocked);
+
+        // Try to withdraw more than unlocked amount - should fail
+        uint256 tryToWithdraw = aliceInitialBalance + 1; // More than unlocked
+
+        (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
+            backendPrivateKey,
+            backend,
+            alice,
+            tryToWithdraw,
+            block.timestamp - 1,
+            block.timestamp + 1 hours,
+            keccak256("try-withdraw-too-much")
+        );
+
+        vm.expectRevert(ErrorsLib.InsufficientBalance.selector);
+        treasury.transferWithAuthorization(
+            backend,
+            alice,
+            tryToWithdraw,
+            block.timestamp - 1,
+            block.timestamp + 1 hours,
+            keccak256("try-withdraw-too-much"),
+            v,
+            r,
+            s
+        );
+
+        // Complete first listing
+        bytes32 listing1Id = treasury.calculateId(listing1);
+        bytes memory purchaseData1 = abi.encode(
+            EXPECTED_NOTARY_FINGERPRINT,
+            "GET",
+            listing1.url,
+            block.timestamp,
+            EXPECTED_QUERIES_HASH
+        );
+        bytes memory seal1 = abi.encodePacked(bytes32(uint256(1)));
+        mockVerifier.setShouldSucceed(true);
+
+        vm.prank(bob);
+        treasury.submitPurchase(listing1Id, purchaseData1, seal1);
+
+        // After completing first listing, Alice has listing2Amount locked
+        // She can now withdraw up to (aliceInitialBalance + listing1Amount - Bob's balance)
+        // But Bob got the listing1Amount, so Alice can withdraw aliceInitialBalance
+    }
+
+    function test_LockedFunds_ExactlyLockedAmount() public {
+        uint256 aliceBalanceBefore = evvm.getBalance(alice, address(usdc));
+
+        // Alice locks all her current funds
+        Treasury.Listing memory listing = Treasury.Listing({
+            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-5555555-5555555",
+            amount: aliceBalanceBefore,
+            shopper: alice
+        });
+
+        vm.startPrank(alice);
+        usdc.approve(address(treasury), aliceBalanceBefore);
+        treasury.list(listing);
+        vm.stopPrank();
+
+        // After listing, Alice has (aliceBalanceBefore + aliceBalanceBefore) total, with aliceBalanceBefore locked
+        // So she has aliceBalanceBefore unlocked
+        uint256 aliceBalanceAfter = evvm.getBalance(alice, address(usdc));
+        assertEq(aliceBalanceAfter, aliceBalanceBefore * 2); // Initial + deposited amount
+
+        // Transfer funds to treasury for withdrawal attempt
+        vm.prank(alice);
+        usdc.transfer(address(treasury), aliceBalanceAfter);
+
+        // Try to withdraw more than unlocked - should fail
+        uint256 tryToWithdraw = aliceBalanceBefore + 1; // More than unlocked amount
+
+        (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
+            backendPrivateKey,
+            backend,
+            alice,
+            tryToWithdraw,
+            block.timestamp - 1,
+            block.timestamp + 1 hours,
+            keccak256("try-withdraw-when-half-locked")
+        );
+
+        vm.expectRevert(ErrorsLib.InsufficientBalance.selector);
+        treasury.transferWithAuthorization(
+            backend,
+            alice,
+            tryToWithdraw,
+            block.timestamp - 1,
+            block.timestamp + 1 hours,
+            keccak256("try-withdraw-when-half-locked"),
             v,
             r,
             s

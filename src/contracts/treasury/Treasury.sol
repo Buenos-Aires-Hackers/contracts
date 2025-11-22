@@ -40,6 +40,7 @@ contract Treasury {
     }
 
     mapping(bytes32 id => Listing listing) public fetchListing;
+    mapping(address who => uint256 amount) locked;
 
     /// @notice Mapping of used nonces for transferWithAuthorization
     mapping(address => mapping(bytes32 => bool)) public authorizationState;
@@ -173,7 +174,7 @@ contract Treasury {
             revert ErrorsLib.PrincipalTokenIsNotWithdrawable();
         }
 
-        if (Evvm(evvmAddress).getBalance(to, token) < amount) {
+        if (Evvm(evvmAddress).getBalance(to, token) - locked[to] < amount) {
             revert ErrorsLib.InsufficientBalance();
         }
 
@@ -192,6 +193,7 @@ contract Treasury {
 
     function list(Listing calldata listing) external {
         depositFrom(listing.shopper, PAYMENT_TOKEN, listing.amount);
+        locked[listing.shopper] += listing.amount;
         fetchListing[keccak256(abi.encode(listing))] = listing;
     }
 
@@ -268,6 +270,7 @@ contract Treasury {
                 listing.amount
             );
             delete fetchListing[id];
+            locked[listing.shopper] -= listing.amount;
             emit ListingFinalized(listing, id, msg.sender);
         } catch {
             revert ZKProofVerificationFailed();
