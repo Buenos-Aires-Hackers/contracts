@@ -348,6 +348,92 @@ contract TreasuryTest is BaseTest {
     }
 
     // ============ transferWithAuthorization Tests ============
+    // NOTE: This is a CUSTOM implementation using ERC-3009 signature for x402 compatibility
+    // It's NOT standard ERC-3009 - it withdraws from recipient's evvm balance, not sender's
+
+    function test_FullMarketplaceFlow() public {
+        // Complete flow: Alice lists → Bob proves purchase → Bob gets paid via x402
+
+        uint256 listingAmount = 100 * 10 ** 6;
+
+        // Step 1: Alice creates listing for Amazon shoes
+        Treasury.Listing memory listing = Treasury.Listing({
+            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-1111111-1111111",
+            amount: listingAmount,
+            shopper: alice
+        });
+
+        vm.startPrank(alice);
+        usdc.approve(address(treasury), listingAmount);
+        treasury.list(listing);
+        vm.stopPrank();
+
+        bytes32 listingId = treasury.calculateId(listing);
+
+        // Alice has evvm balance, Bob has none yet
+        assertEq(evvm.getBalance(alice, address(usdc)), 1000 * 10 ** 6 + listingAmount);
+        assertEq(evvm.getBalance(bob, address(usdc)), 0);
+
+        // Step 2-4: Bob buys with credit card, gets receipt, webapp creates ZK proof,
+        // Bob submits proof → Alice's evvm balance transfers to Bob's evvm balance
+        bytes memory purchaseData = abi.encode(
+            EXPECTED_NOTARY_FINGERPRINT,
+            "GET",
+            listing.url,
+            block.timestamp,
+            EXPECTED_QUERIES_HASH
+        );
+        bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
+        mockVerifier.setShouldSucceed(true);
+
+        vm.prank(bob);
+        treasury.submitPurchase(listingId, purchaseData, seal);
+
+        // Now Bob has evvm balance, Alice's decreased
+        assertEq(evvm.getBalance(alice, address(usdc)), 1000 * 10 ** 6);
+        assertEq(evvm.getBalance(bob, address(usdc)), listingAmount);
+
+        // Step 5: Webapp uses x402 to pay out Bob's earned funds
+        // Alice signs authorization for Bob to withdraw his earned payment
+        uint256 validAfter = block.timestamp - 1;
+        uint256 validBefore = block.timestamp + 1 hours;
+        bytes32 nonce = keccak256("payment-release-1");
+
+        // Transfer real USDC to treasury so it can process withdrawal
+        vm.prank(alice);
+        usdc.transfer(address(treasury), listingAmount);
+
+        uint256 bobWalletBefore = usdc.balanceOf(bob);
+
+        // Alice signs the payment release (x402 payment request response)
+        (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
+            alicePrivateKey,
+            alice,
+            bob,
+            listingAmount,
+            validAfter,
+            validBefore,
+            nonce
+        );
+
+        // x402 facilitator submits the signed authorization
+        vm.prank(merchant); // merchant acts as facilitator
+        treasury.transferWithAuthorization(
+            alice,
+            bob,
+            listingAmount,
+            validAfter,
+            validBefore,
+            nonce,
+            v,
+            r,
+            s
+        );
+
+        // Bob's evvm balance withdrawn, wallet balance increased
+        assertEq(evvm.getBalance(bob, address(usdc)), 0);
+        assertEq(usdc.balanceOf(bob), bobWalletBefore + listingAmount);
+    }
 
     function test_TransferWithAuthorization_Success() public {
         uint256 transferAmount = 100 * 10 ** 6;
