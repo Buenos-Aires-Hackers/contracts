@@ -67,12 +67,7 @@ contract TreasuryWithRealProofs is BaseTest, RiscZeroTestHelper {
         // Step 2: Generate a real ZK proof for the purchase
         // Your zkVM program should verify the Amazon purchase and extract relevant data
         // NOTE: Update this to match your zkVM program's expected input format
-        bytes memory purchaseInput = abi.encode(
-            listing.url,
-            block.timestamp
-            // Add other inputs your zkVM program needs
-            // e.g., API response, notary fingerprint, queries hash, etc.
-        );
+        bytes memory purchaseInput = abi.encode(listing.url);
         
         // Generate proof using RISC Zero FFI
         (bytes memory journal, bytes memory seal, bytes32 journalHash) = 
@@ -85,6 +80,7 @@ contract TreasuryWithRealProofs is BaseTest, RiscZeroTestHelper {
         // Step 3: Decode the journal to get the purchase data
         // The journal format should match what your zkVM program outputs
         // NOTE: Update this to match your zkVM program's output format
+        // Treasury expects: (bytes32 notaryKeyFingerprint, string method, string url, bytes32 queriesHash)
         (
             bytes32 notaryKeyFingerprint,
             string memory method,
@@ -141,16 +137,25 @@ contract TreasuryWithRealProofs is BaseTest, RiscZeroTestHelper {
      */
     function generatePurchaseProof(
         string memory amazonUrl
-        // Add other parameters your zkVM program needs
     ) internal returns (bytes memory purchaseData, bytes memory seal) {
         // Prepare input for your zkVM program
+        // NOTE: Update this to match your zkVM program's expected input
         bytes memory input = abi.encode(amazonUrl);
 
         // Generate proof
         (bytes memory journal, bytes memory sealGenerated) = generateProof(ELF_PATH, input);
         
         // Decode journal to get purchase data
-        purchaseData = journal; // Or decode and re-encode based on your format
+        // Treasury expects: (bytes32, string, string, bytes32)
+        (
+            bytes32 notaryKeyFingerprint,
+            string memory method,
+            string memory url,
+            bytes32 queriesHash
+        ) = abi.decode(journal, (bytes32, string, string, bytes32));
+        
+        // Re-encode as purchaseData for Treasury
+        purchaseData = abi.encode(notaryKeyFingerprint, method, url, queriesHash);
         
         return (purchaseData, sealGenerated);
     }
