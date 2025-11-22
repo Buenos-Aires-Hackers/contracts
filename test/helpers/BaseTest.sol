@@ -40,11 +40,13 @@ abstract contract BaseTest is Test {
     address public charlie;
     address public executor;
     address public merchant;
+    address public backend;
 
     // Private keys for signing
     uint256 public alicePrivateKey;
     uint256 public bobPrivateKey;
     uint256 public charliePrivateKey;
+    uint256 public backendPrivateKey;
 
     // Constants
     uint256 public constant INITIAL_BALANCE = 1000 ether;
@@ -62,10 +64,12 @@ abstract contract BaseTest is Test {
         alicePrivateKey = 0xA11CE;
         bobPrivateKey = 0xB0B;
         charliePrivateKey = 0xC4A211E;
+        backendPrivateKey = 0xBAC4E11D;
 
         alice = vm.addr(alicePrivateKey);
         bob = vm.addr(bobPrivateKey);
         charlie = vm.addr(charliePrivateKey);
+        backend = vm.addr(backendPrivateKey);
 
         // Deploy mock tokens
         usdc = new MockERC20("USD Coin", "USDC", 6);
@@ -176,6 +180,7 @@ abstract contract BaseTest is Test {
         vm.label(admin, "Admin");
         vm.label(executor, "Executor");
         vm.label(merchant, "Merchant");
+        vm.label(backend, "Backend");
     }
 
     // Helper functions for tests

@@ -278,10 +278,11 @@ contract Treasury {
      * @notice CUSTOM x402-compatible payment release function
      * @dev This is NOT standard ERC-3009! Uses the signature for x402 compatibility,
      *      but implements custom behavior for marketplace escrow release:
-     *      - `from` (Alice) signs to authorize payment release
+     *      - `from` (backend) signs to authorize payment release
      *      - Withdraws from `to` (Bob) evvm balance to `to` wallet
      *      - Used after Bob proves Amazon purchase via ZK proof
-     * @param from The authorizer (Alice - signs the release)
+     *      - Backend automatically signs and submits via x402 after proof verification
+     * @param from The authorizer (backend address - signs the release)
      * @param to The recipient (Bob - receives the payout)
      * @param value Amount to withdraw
      * @param validAfter Timestamp after which authorization is valid

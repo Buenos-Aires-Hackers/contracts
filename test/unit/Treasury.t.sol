@@ -393,8 +393,8 @@ contract TreasuryTest is BaseTest {
         assertEq(evvm.getBalance(alice, address(usdc)), 1000 * 10 ** 6);
         assertEq(evvm.getBalance(bob, address(usdc)), listingAmount);
 
-        // Step 5: Webapp uses x402 to pay out Bob's earned funds
-        // Alice signs authorization for Bob to withdraw his earned payment
+        // Step 5: Webapp backend automatically triggers x402 payout
+        // Backend signs authorization for Bob to withdraw his earned payment
         uint256 validAfter = block.timestamp - 1;
         uint256 validBefore = block.timestamp + 1 hours;
         bytes32 nonce = keccak256("payment-release-1");
@@ -405,10 +405,10 @@ contract TreasuryTest is BaseTest {
 
         uint256 bobWalletBefore = usdc.balanceOf(bob);
 
-        // Alice signs the payment release (x402 payment request response)
+        // Backend signs the payment release (automated after ZK proof verification)
         (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
-            alicePrivateKey,
-            alice,
+            backendPrivateKey,
+            backend,
             bob,
             listingAmount,
             validAfter,
@@ -416,10 +416,9 @@ contract TreasuryTest is BaseTest {
             nonce
         );
 
-        // x402 facilitator submits the signed authorization
-        vm.prank(merchant); // merchant acts as facilitator
+        // x402 facilitator submits the backend-signed authorization
         treasury.transferWithAuthorization(
-            alice,
+            backend,
             bob,
             listingAmount,
             validAfter,
@@ -452,10 +451,10 @@ contract TreasuryTest is BaseTest {
         uint256 bobEvvmBalanceBefore = evvm.getBalance(bob, address(usdc));
         uint256 bobWalletBalanceBefore = usdc.balanceOf(bob);
 
-        // Alice signs the authorization for Bob to withdraw
+        // Backend signs the authorization for Bob to withdraw
         (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
-            alicePrivateKey,
-            alice,
+            backendPrivateKey,
+            backend,
             bob,
             transferAmount,
             validAfter,
@@ -465,12 +464,11 @@ contract TreasuryTest is BaseTest {
 
         // Expect ERC-3009 AuthorizationUsed event
         vm.expectEmit(true, true, false, false);
-        emit Treasury.AuthorizationUsed(alice, nonce);
+        emit Treasury.AuthorizationUsed(backend, nonce);
 
-        // Merchant submits the signed authorization
-        vm.prank(merchant);
+        // x402 submits the backend-signed authorization
         treasury.transferWithAuthorization(
-            alice,
+            backend,
             bob,
             transferAmount,
             validAfter,
@@ -493,10 +491,10 @@ contract TreasuryTest is BaseTest {
         uint256 validBefore = block.timestamp + 1 hours;
         bytes32 nonce = keccak256("unique-nonce-2");
 
-        // Bob signs instead of Alice (wrong signer)
+        // Alice signs instead of backend (wrong signer)
         (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
-            bobPrivateKey,
-            alice,
+            alicePrivateKey,
+            backend,
             bob,
             transferAmount,
             validAfter,
@@ -504,10 +502,9 @@ contract TreasuryTest is BaseTest {
             nonce
         );
 
-        vm.prank(merchant);
         vm.expectRevert(Treasury.InvalidSignature.selector);
         treasury.transferWithAuthorization(
-            alice,
+            backend,
             bob,
             transferAmount,
             validAfter,
@@ -533,10 +530,10 @@ contract TreasuryTest is BaseTest {
         vm.prank(alice);
         usdc.transfer(address(treasury), transferAmount * 2);
 
-        // Alice signs the authorization
+        // Backend signs the authorization
         (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
-            alicePrivateKey,
-            alice,
+            backendPrivateKey,
+            backend,
             bob,
             transferAmount,
             validAfter,
@@ -545,9 +542,8 @@ contract TreasuryTest is BaseTest {
         );
 
         // First call succeeds
-        vm.prank(merchant);
         treasury.transferWithAuthorization(
-            alice,
+            backend,
             bob,
             transferAmount,
             validAfter,
@@ -559,10 +555,9 @@ contract TreasuryTest is BaseTest {
         );
 
         // Second call with same signature should fail (nonce already used)
-        vm.prank(merchant);
         vm.expectRevert(Treasury.AuthorizationAlreadyUsed.selector);
         treasury.transferWithAuthorization(
-            alice,
+            backend,
             bob,
             transferAmount,
             validAfter,
@@ -581,8 +576,8 @@ contract TreasuryTest is BaseTest {
         bytes32 nonce = keccak256("unique-nonce-4");
 
         (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
-            alicePrivateKey,
-            alice,
+            backendPrivateKey,
+            backend,
             bob,
             transferAmount,
             validAfter,
@@ -590,10 +585,9 @@ contract TreasuryTest is BaseTest {
             nonce
         );
 
-        vm.prank(merchant);
         vm.expectRevert(Treasury.Expired.selector);
         treasury.transferWithAuthorization(
-            alice,
+            backend,
             bob,
             transferAmount,
             validAfter,
@@ -612,8 +606,8 @@ contract TreasuryTest is BaseTest {
         bytes32 nonce = keccak256("unique-nonce-5");
 
         (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
-            alicePrivateKey,
-            alice,
+            backendPrivateKey,
+            backend,
             bob,
             transferAmount,
             validAfter,
@@ -623,10 +617,9 @@ contract TreasuryTest is BaseTest {
 
         vm.warp(300);
 
-        vm.prank(merchant);
         vm.expectRevert(Treasury.Expired.selector);
         treasury.transferWithAuthorization(
-            alice,
+            backend,
             bob,
             transferAmount,
             validAfter,
