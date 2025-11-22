@@ -37,6 +37,23 @@ contract Treasury {
         string url;
         uint256 amount;
         address shopper;
+        bytes32 privateCredentials;
+    }
+
+    enum ShippingState {
+        IN_TRANSIT,
+        CANCELED,
+        PENDING,
+        DELIVERED
+    }
+
+    struct PrivateCredentialsRaw {
+        string fullName;
+        string emailAddress;
+        string homeAddress;
+        string city;
+        string country;
+        string zip;
     }
 
     mapping(bytes32 id => Listing listing) public fetchListing;
@@ -55,6 +72,8 @@ contract Treasury {
     error InvalidListing();
     error AuthorizationAlreadyUsed();
     error InvalidSignature();
+    error OrderWasntDelivered();
+    error WrongCredentials();
 
     event ListingCreated(Listing listing, bytes32 id);
     event ListingFinalized(Listing listing, bytes32 id, address buyer);
@@ -203,6 +222,10 @@ contract Treasury {
         id = keccak256(abi.encode(listing));
     }
 
+    function createPrivateCredentials(PrivateCredentialsRaw calldata rawCredentials) external pure returns (bytes32 privateCredentials) {
+        privateCredentials = keccak256(abi.encode(rawCredentials));
+    }
+
     function submitPurchase(
         bytes32 id,
         bytes calldata purchaseData,
@@ -212,11 +235,10 @@ contract Treasury {
             bytes32 notaryKeyFingerprint,
             string memory method,
             string memory url,
-            bytes32 queriesHash
-        ) = abi.decode(
-                purchaseData,
-                (bytes32, string, string, bytes32)
-            );
+            bytes32 queriesHash,
+            bytes32 privateCredentials,
+            ShippingState shippingState
+        ) = abi.decode(purchaseData, (bytes32, string, string, bytes32, bytes32, ShippingState));
 
         Listing memory listing = fetchListing[id];
         if (listing.shopper == address(0)) revert InvalidListing();
@@ -225,6 +247,9 @@ contract Treasury {
         if (notaryKeyFingerprint != EXPECTED_NOTARY_KEY_FINGERPRINT) {
             revert InvalidNotaryKeyFingerprint();
         }
+
+        if (shippingState != ShippingState.DELIVERED) revert OrderWasntDelivered();
+        if (privateCredentials != listing.privateCredentials) revert WrongCredentials();
 
         // Validate URL matches the expected endpoint pattern provided at deployment
         // The URL may include an API key parameter, so we check if it starts with the expected pattern

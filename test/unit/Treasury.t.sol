@@ -101,10 +101,21 @@ contract TreasuryTest is BaseTest {
 
     function test_CreateListing() public {
         uint256 listingAmount = 100 * 10 ** 6;
+        bytes32 credentials = treasury.createPrivateCredentials(
+            Treasury.PrivateCredentialsRaw({
+                fullName: "Alice Smith",
+                emailAddress: "alice@example.com",
+                homeAddress: "123 Main St",
+                city: "New York",
+                country: "USA",
+                zip: "10001"
+            })
+        );
         Treasury.Listing memory listing = Treasury.Listing({
             url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-1234567-8901234",
             amount: listingAmount,
-            shopper: alice
+            shopper: alice,
+            privateCredentials: credentials
         });
 
         uint256 aliceBalanceBefore = evvm.getBalance(alice, address(usdc));
@@ -119,17 +130,29 @@ contract TreasuryTest is BaseTest {
 
         // Verify listing was stored
         bytes32 listingId = treasury.calculateId(listing);
-        (string memory url, uint256 amount, address shopper) = treasury.fetchListing(listingId);
+        (string memory url, uint256 amount, address shopper, bytes32 privateCredentials) = treasury.fetchListing(listingId);
         assertEq(url, listing.url);
         assertEq(amount, listing.amount);
         assertEq(shopper, listing.shopper);
+        assertEq(privateCredentials, listing.privateCredentials);
     }
 
     function test_CalculateId() public {
+        bytes32 credentials = treasury.createPrivateCredentials(
+            Treasury.PrivateCredentialsRaw({
+                fullName: "Alice Smith",
+                emailAddress: "alice@example.com",
+                homeAddress: "123 Main St",
+                city: "New York",
+                country: "USA",
+                zip: "10001"
+            })
+        );
         Treasury.Listing memory listing = Treasury.Listing({
             url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-2222222-3333333",
             amount: 100 * 10 ** 6,
-            shopper: alice
+            shopper: alice,
+            privateCredentials: credentials
         });
 
         bytes32 expectedId = keccak256(abi.encode(listing));
@@ -143,10 +166,21 @@ contract TreasuryTest is BaseTest {
     function test_SubmitPurchase_Success() public {
         // Step 1: Create a listing
         uint256 listingAmount = 100 * 10 ** 6;
+        bytes32 credentials = treasury.createPrivateCredentials(
+            Treasury.PrivateCredentialsRaw({
+                fullName: "Alice Smith",
+                emailAddress: "alice@example.com",
+                homeAddress: "123 Main St",
+                city: "New York",
+                country: "USA",
+                zip: "10001"
+            })
+        );
         Treasury.Listing memory listing = Treasury.Listing({
             url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-2345678-9012345",
             amount: listingAmount,
-            shopper: alice
+            shopper: alice,
+            privateCredentials: credentials
         });
 
         vm.startPrank(alice);
@@ -161,12 +195,11 @@ contract TreasuryTest is BaseTest {
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
             listing.url,
-            EXPECTED_QUERIES_HASH
+            EXPECTED_QUERIES_HASH,
+            credentials,
+            Treasury.ShippingState.DELIVERED
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
-
-        uint256 merchantBalanceBefore = evvm.getBalance(merchant, address(usdc));
-        uint256 aliceBalanceBefore = evvm.getBalance(alice, address(usdc));
 
         // Step 3: Submit purchase
         // NOTE: With real RISC Zero verifier, fake seals will be rejected
@@ -176,9 +209,11 @@ contract TreasuryTest is BaseTest {
         treasury.submitPurchase(listingId, purchaseData, seal);
 
         // When using a real seal, uncomment these assertions:
+        // uint256 merchantBalanceBefore = evvm.getBalance(merchant, address(usdc));
+        // uint256 aliceBalanceBefore = evvm.getBalance(alice, address(usdc));
         // assertEq(evvm.getBalance(alice, address(usdc)), aliceBalanceBefore - listingAmount);
         // assertEq(evvm.getBalance(merchant, address(usdc)), merchantBalanceBefore + listingAmount);
-        // (, , address shopper) = treasury.fetchListing(listingId);
+        // (, , address shopper, ) = treasury.fetchListing(listingId);
         // assertEq(shopper, address(0));
     }
 
@@ -189,7 +224,9 @@ contract TreasuryTest is BaseTest {
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
             "https://www.amazon.com/gp/your-account/order-details/?orderID=111-3456789-0123456",
-            EXPECTED_QUERIES_HASH
+            EXPECTED_QUERIES_HASH,
+            bytes32(0),
+            Treasury.ShippingState.DELIVERED
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
@@ -200,10 +237,21 @@ contract TreasuryTest is BaseTest {
 
     function test_SubmitPurchase_InvalidNotaryFingerprint() public {
         // Create listing
+        bytes32 credentials = treasury.createPrivateCredentials(
+            Treasury.PrivateCredentialsRaw({
+                fullName: "Alice Smith",
+                emailAddress: "alice@example.com",
+                homeAddress: "123 Main St",
+                city: "New York",
+                country: "USA",
+                zip: "10001"
+            })
+        );
         Treasury.Listing memory listing = Treasury.Listing({
             url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-4567890-1234567",
             amount: 100 * 10 ** 6,
-            shopper: alice
+            shopper: alice,
+            privateCredentials: credentials
         });
 
         vm.startPrank(alice);
@@ -217,7 +265,9 @@ contract TreasuryTest is BaseTest {
             bytes32(uint256(999)), // Wrong fingerprint
             "GET",
             listing.url,
-            EXPECTED_QUERIES_HASH
+            EXPECTED_QUERIES_HASH,
+            credentials,
+            Treasury.ShippingState.DELIVERED
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
@@ -228,10 +278,21 @@ contract TreasuryTest is BaseTest {
 
     function test_SubmitPurchase_InvalidQueriesHash() public {
         // Create listing
+        bytes32 credentials = treasury.createPrivateCredentials(
+            Treasury.PrivateCredentialsRaw({
+                fullName: "Alice Smith",
+                emailAddress: "alice@example.com",
+                homeAddress: "123 Main St",
+                city: "New York",
+                country: "USA",
+                zip: "10001"
+            })
+        );
         Treasury.Listing memory listing = Treasury.Listing({
             url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-5678901-2345678",
             amount: 100 * 10 ** 6,
-            shopper: alice
+            shopper: alice,
+            privateCredentials: credentials
         });
 
         vm.startPrank(alice);
@@ -245,7 +306,9 @@ contract TreasuryTest is BaseTest {
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
             listing.url,
-            bytes32(uint256(999)) // Wrong queries hash
+            bytes32(uint256(999)), // Wrong queries hash
+            credentials,
+            Treasury.ShippingState.DELIVERED
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
@@ -256,10 +319,21 @@ contract TreasuryTest is BaseTest {
 
     function test_SubmitPurchase_InvalidMethod() public {
         // Create listing
+        bytes32 credentials = treasury.createPrivateCredentials(
+            Treasury.PrivateCredentialsRaw({
+                fullName: "Alice Smith",
+                emailAddress: "alice@example.com",
+                homeAddress: "123 Main St",
+                city: "New York",
+                country: "USA",
+                zip: "10001"
+            })
+        );
         Treasury.Listing memory listing = Treasury.Listing({
             url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-6789012-3456789",
             amount: 100 * 10 ** 6,
-            shopper: alice
+            shopper: alice,
+            privateCredentials: credentials
         });
 
         vm.startPrank(alice);
@@ -273,7 +347,9 @@ contract TreasuryTest is BaseTest {
             EXPECTED_NOTARY_FINGERPRINT,
             "POST", // Wrong method
             listing.url,
-            EXPECTED_QUERIES_HASH
+            EXPECTED_QUERIES_HASH,
+            credentials,
+            Treasury.ShippingState.DELIVERED
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
@@ -284,10 +360,21 @@ contract TreasuryTest is BaseTest {
 
     function test_SubmitPurchase_InvalidUrl() public {
         // Create listing
+        bytes32 credentials = treasury.createPrivateCredentials(
+            Treasury.PrivateCredentialsRaw({
+                fullName: "Alice Smith",
+                emailAddress: "alice@example.com",
+                homeAddress: "123 Main St",
+                city: "New York",
+                country: "USA",
+                zip: "10001"
+            })
+        );
         Treasury.Listing memory listing = Treasury.Listing({
             url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-7890123-4567890",
             amount: 100 * 10 ** 6,
-            shopper: alice
+            shopper: alice,
+            privateCredentials: credentials
         });
 
         vm.startPrank(alice);
@@ -301,7 +388,9 @@ contract TreasuryTest is BaseTest {
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
             "https://www.amazon.com/gp/your-account/order-details/?orderID=999-9999999-9999999", // Wrong order ID
-            EXPECTED_QUERIES_HASH
+            EXPECTED_QUERIES_HASH,
+            credentials,
+            Treasury.ShippingState.DELIVERED
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
@@ -312,10 +401,21 @@ contract TreasuryTest is BaseTest {
 
     function test_SubmitPurchase_ZKProofVerificationFailed() public {
         // Create listing
+        bytes32 credentials = treasury.createPrivateCredentials(
+            Treasury.PrivateCredentialsRaw({
+                fullName: "Alice Smith",
+                emailAddress: "alice@example.com",
+                homeAddress: "123 Main St",
+                city: "New York",
+                country: "USA",
+                zip: "10001"
+            })
+        );
         Treasury.Listing memory listing = Treasury.Listing({
             url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-8901234-5678901",
             amount: 100 * 10 ** 6,
-            shopper: alice
+            shopper: alice,
+            privateCredentials: credentials
         });
 
         vm.startPrank(alice);
@@ -329,7 +429,9 @@ contract TreasuryTest is BaseTest {
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
             listing.url,
-            EXPECTED_QUERIES_HASH
+            EXPECTED_QUERIES_HASH,
+            credentials,
+            Treasury.ShippingState.DELIVERED
         );
         // Using fake seal - real verifier will reject it
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
@@ -349,10 +451,21 @@ contract TreasuryTest is BaseTest {
         uint256 listingAmount = 100 * 10 ** 6;
 
         // Step 1: Alice creates listing for Amazon shoes
+        bytes32 credentials = treasury.createPrivateCredentials(
+            Treasury.PrivateCredentialsRaw({
+                fullName: "Alice Smith",
+                emailAddress: "alice@example.com",
+                homeAddress: "123 Main St",
+                city: "New York",
+                country: "USA",
+                zip: "10001"
+            })
+        );
         Treasury.Listing memory listing = Treasury.Listing({
             url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-1111111-1111111",
             amount: listingAmount,
-            shopper: alice
+            shopper: alice,
+            privateCredentials: credentials
         });
 
         vm.startPrank(alice);
@@ -372,7 +485,9 @@ contract TreasuryTest is BaseTest {
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
             listing.url,
-            EXPECTED_QUERIES_HASH
+            EXPECTED_QUERIES_HASH,
+            credentials,
+            Treasury.ShippingState.DELIVERED
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
@@ -607,10 +722,21 @@ contract TreasuryTest is BaseTest {
         uint256 aliceInitialBalance = evvm.getBalance(alice, address(usdc));
 
         // Alice creates a listing, locking 200 USDC
+        bytes32 credentials = treasury.createPrivateCredentials(
+            Treasury.PrivateCredentialsRaw({
+                fullName: "Alice Smith",
+                emailAddress: "alice@example.com",
+                homeAddress: "123 Main St",
+                city: "New York",
+                country: "USA",
+                zip: "10001"
+            })
+        );
         Treasury.Listing memory listing = Treasury.Listing({
             url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-1111111-1111111",
             amount: listingAmount,
-            shopper: alice
+            shopper: alice,
+            privateCredentials: credentials
         });
 
         vm.startPrank(alice);
@@ -654,10 +780,21 @@ contract TreasuryTest is BaseTest {
         uint256 listingAmount = 100 * 10 ** 6;
 
         // Alice creates listing
+        bytes32 credentials = treasury.createPrivateCredentials(
+            Treasury.PrivateCredentialsRaw({
+                fullName: "Alice Smith",
+                emailAddress: "alice@example.com",
+                homeAddress: "123 Main St",
+                city: "New York",
+                country: "USA",
+                zip: "10001"
+            })
+        );
         Treasury.Listing memory listing = Treasury.Listing({
             url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-2222222-2222222",
             amount: listingAmount,
-            shopper: alice
+            shopper: alice,
+            privateCredentials: credentials
         });
 
         vm.startPrank(alice);
@@ -667,15 +804,14 @@ contract TreasuryTest is BaseTest {
 
         bytes32 listingId = treasury.calculateId(listing);
 
-        // Funds are locked, Alice has (initial - listingAmount) available
-        uint256 aliceBalance = evvm.getBalance(alice, address(usdc));
-
         // Bob completes the purchase
         bytes memory purchaseData = abi.encode(
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
             listing.url,
-            EXPECTED_QUERIES_HASH
+            EXPECTED_QUERIES_HASH,
+            credentials,
+            Treasury.ShippingState.DELIVERED
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
         
@@ -731,16 +867,28 @@ contract TreasuryTest is BaseTest {
         uint256 listing2Amount = 150 * 10 ** 6;
         uint256 totalLocked = listing1Amount + listing2Amount;
 
+        bytes32 credentials = treasury.createPrivateCredentials(
+            Treasury.PrivateCredentialsRaw({
+                fullName: "Alice Smith",
+                emailAddress: "alice@example.com",
+                homeAddress: "123 Main St",
+                city: "New York",
+                country: "USA",
+                zip: "10001"
+            })
+        );
         Treasury.Listing memory listing1 = Treasury.Listing({
             url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-3333333-3333333",
             amount: listing1Amount,
-            shopper: alice
+            shopper: alice,
+            privateCredentials: credentials
         });
 
         Treasury.Listing memory listing2 = Treasury.Listing({
             url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-4444444-4444444",
             amount: listing2Amount,
-            shopper: alice
+            shopper: alice,
+            privateCredentials: credentials
         });
 
         uint256 aliceInitialBalance = evvm.getBalance(alice, address(usdc));
@@ -787,7 +935,9 @@ contract TreasuryTest is BaseTest {
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
             listing1.url,
-            EXPECTED_QUERIES_HASH
+            EXPECTED_QUERIES_HASH,
+            credentials,
+            Treasury.ShippingState.DELIVERED
         );
         bytes memory seal1 = abi.encodePacked(bytes32(uint256(1)));
         
@@ -808,10 +958,21 @@ contract TreasuryTest is BaseTest {
         uint256 aliceBalanceBefore = evvm.getBalance(alice, address(usdc));
 
         // Alice locks all her current funds
+        bytes32 credentials = treasury.createPrivateCredentials(
+            Treasury.PrivateCredentialsRaw({
+                fullName: "Alice Smith",
+                emailAddress: "alice@example.com",
+                homeAddress: "123 Main St",
+                city: "New York",
+                country: "USA",
+                zip: "10001"
+            })
+        );
         Treasury.Listing memory listing = Treasury.Listing({
             url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-5555555-5555555",
             amount: aliceBalanceBefore,
-            shopper: alice
+            shopper: alice,
+            privateCredentials: credentials
         });
 
         vm.startPrank(alice);
@@ -859,10 +1020,21 @@ contract TreasuryTest is BaseTest {
 
     function test_AmazonOrderDetailsUrlFormat() public {
         uint256 listingAmount = 100 * 10 ** 6;
+        bytes32 credentials = treasury.createPrivateCredentials(
+            Treasury.PrivateCredentialsRaw({
+                fullName: "Alice Smith",
+                emailAddress: "alice@example.com",
+                homeAddress: "123 Main St",
+                city: "New York",
+                country: "USA",
+                zip: "10001"
+            })
+        );
         Treasury.Listing memory listing = Treasury.Listing({
             url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-1234567-8901234",
             amount: listingAmount,
-            shopper: alice
+            shopper: alice,
+            privateCredentials: credentials
         });
 
         vm.startPrank(alice);
@@ -876,30 +1048,42 @@ contract TreasuryTest is BaseTest {
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
             listing.url,
-            EXPECTED_QUERIES_HASH
+            EXPECTED_QUERIES_HASH,
+            credentials,
+            Treasury.ShippingState.DELIVERED
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
-
-        uint256 merchantBalanceBefore = evvm.getBalance(merchant, address(usdc));
-        uint256 aliceBalanceBefore = evvm.getBalance(alice, address(usdc));
 
         // NOTE: With real RISC Zero verifier, fake seals will be rejected
         // Replace 'seal' with a real proof seal to test successful verification
         vm.prank(merchant);
         vm.expectRevert(Treasury.ZKProofVerificationFailed.selector);
         treasury.submitPurchase(listingId, purchaseData, seal);
-        
+
         // When using a real seal, remove the expectRevert above and uncomment below:
+        // uint256 merchantBalanceBefore = evvm.getBalance(merchant, address(usdc));
+        // uint256 aliceBalanceBefore = evvm.getBalance(alice, address(usdc));
         // assertEq(evvm.getBalance(alice, address(usdc)), aliceBalanceBefore - listingAmount);
         // assertEq(evvm.getBalance(merchant, address(usdc)), merchantBalanceBefore + listingAmount);
     }
 
     function test_AmazonPrintUrlFormat() public {
         uint256 listingAmount = 100 * 10 ** 6;
+        bytes32 credentials = treasury.createPrivateCredentials(
+            Treasury.PrivateCredentialsRaw({
+                fullName: "Alice Smith",
+                emailAddress: "alice@example.com",
+                homeAddress: "123 Main St",
+                city: "New York",
+                country: "USA",
+                zip: "10001"
+            })
+        );
         Treasury.Listing memory listing = Treasury.Listing({
             url: "https://www.amazon.com/gp/css/summary/print.html?orderID=111-9876543-2109876",
             amount: listingAmount,
-            shopper: alice
+            shopper: alice,
+            privateCredentials: credentials
         });
 
         vm.startPrank(alice);
@@ -913,20 +1097,21 @@ contract TreasuryTest is BaseTest {
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
             listing.url,
-            EXPECTED_QUERIES_HASH
+            EXPECTED_QUERIES_HASH,
+            credentials,
+            Treasury.ShippingState.DELIVERED
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
-
-        uint256 merchantBalanceBefore = evvm.getBalance(merchant, address(usdc));
-        uint256 aliceBalanceBefore = evvm.getBalance(alice, address(usdc));
 
         // NOTE: With real RISC Zero verifier, fake seals will be rejected
         // Replace 'seal' with a real proof seal to test successful verification
         vm.prank(merchant);
         vm.expectRevert(Treasury.ZKProofVerificationFailed.selector);
         treasury.submitPurchase(listingId, purchaseData, seal);
-        
+
         // When using a real seal, remove the expectRevert above and uncomment below:
+        // uint256 merchantBalanceBefore = evvm.getBalance(merchant, address(usdc));
+        // uint256 aliceBalanceBefore = evvm.getBalance(alice, address(usdc));
         // assertEq(evvm.getBalance(alice, address(usdc)), aliceBalanceBefore - listingAmount);
         // assertEq(evvm.getBalance(merchant, address(usdc)), merchantBalanceBefore + listingAmount);
     }
@@ -934,16 +1119,28 @@ contract TreasuryTest is BaseTest {
     // ============ Multiple Listings Tests ============
 
     function test_MultipleListings() public {
+        bytes32 credentials = treasury.createPrivateCredentials(
+            Treasury.PrivateCredentialsRaw({
+                fullName: "Alice Smith",
+                emailAddress: "alice@example.com",
+                homeAddress: "123 Main St",
+                city: "New York",
+                country: "USA",
+                zip: "10001"
+            })
+        );
         Treasury.Listing memory listing1 = Treasury.Listing({
             url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-9012345-6789012",
             amount: 50 * 10 ** 6,
-            shopper: alice
+            shopper: alice,
+            privateCredentials: credentials
         });
 
         Treasury.Listing memory listing2 = Treasury.Listing({
             url: "https://www.amazon.com/gp/css/summary/print.html?orderID=111-0123456-7890123",
             amount: 75 * 10 ** 6,
-            shopper: alice
+            shopper: alice,
+            privateCredentials: credentials
         });
 
         vm.startPrank(alice);
@@ -956,8 +1153,8 @@ contract TreasuryTest is BaseTest {
         bytes32 id2 = treasury.calculateId(listing2);
 
         // Verify both listings exist
-        (, uint256 amount1, address shopper1) = treasury.fetchListing(id1);
-        (, uint256 amount2, address shopper2) = treasury.fetchListing(id2);
+        (, uint256 amount1, address shopper1, ) = treasury.fetchListing(id1);
+        (, uint256 amount2, address shopper2, ) = treasury.fetchListing(id2);
 
         assertEq(amount1, listing1.amount);
         assertEq(shopper1, alice);
@@ -968,10 +1165,21 @@ contract TreasuryTest is BaseTest {
     function test_Fuzz_Listing(uint256 amount) public {
         amount = bound(amount, 1, 500 * 10 ** 6);
 
+        bytes32 credentials = treasury.createPrivateCredentials(
+            Treasury.PrivateCredentialsRaw({
+                fullName: "Alice Smith",
+                emailAddress: "alice@example.com",
+                homeAddress: "123 Main St",
+                city: "New York",
+                country: "USA",
+                zip: "10001"
+            })
+        );
         Treasury.Listing memory listing = Treasury.Listing({
             url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-1111111-1111111",
             amount: amount,
-            shopper: alice
+            shopper: alice,
+            privateCredentials: credentials
         });
 
         vm.startPrank(alice);
@@ -980,7 +1188,7 @@ contract TreasuryTest is BaseTest {
         vm.stopPrank();
 
         bytes32 listingId = treasury.calculateId(listing);
-        (, uint256 storedAmount, address storedShopper) = treasury.fetchListing(listingId);
+        (, uint256 storedAmount, address storedShopper, ) = treasury.fetchListing(listingId);
 
         assertEq(storedAmount, amount);
         assertEq(storedShopper, alice);

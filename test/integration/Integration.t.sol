@@ -62,10 +62,21 @@ contract IntegrationTest is BaseTest {
 
         // 2. Alice creates a listing
         uint256 listingAmount = 100 * 10 ** 6;
+        bytes32 credentials = treasury.createPrivateCredentials(
+            Treasury.PrivateCredentialsRaw({
+                fullName: "Alice Smith",
+                emailAddress: "alice@example.com",
+                homeAddress: "123 Main St",
+                city: "New York",
+                country: "USA",
+                zip: "10001"
+            })
+        );
         Treasury.Listing memory listing = Treasury.Listing({
             url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-1234567-8901234",
             amount: listingAmount,
-            shopper: alice
+            shopper: alice,
+            privateCredentials: credentials
         });
 
         vm.startPrank(alice);
@@ -75,10 +86,11 @@ contract IntegrationTest is BaseTest {
 
         // 3. Verify listing was created and balance increased
         bytes32 listingId = treasury.calculateId(listing);
-        (string memory url, uint256 amount, address shopper) = treasury.fetchListing(listingId);
+        (string memory url, uint256 amount, address shopper, bytes32 privateCredentials) = treasury.fetchListing(listingId);
         assertEq(url, listing.url);
         assertEq(amount, listingAmount);
         assertEq(shopper, alice);
+        assertEq(privateCredentials, listing.privateCredentials);
         assertEq(evvm.getBalance(alice, address(usdc)), balanceAfterDeposit + listingAmount);
     }
 
