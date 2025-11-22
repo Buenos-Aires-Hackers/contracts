@@ -100,7 +100,7 @@ contract TreasuryTest is BaseTest {
     function test_CreateListing() public {
         uint256 listingAmount = 100 * 10 ** 6;
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://api.etherscan.io/api?module=account&action=balance",
+            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-1234567-8901234",
             amount: listingAmount,
             shopper: alice
         });
@@ -125,7 +125,7 @@ contract TreasuryTest is BaseTest {
 
     function test_CalculateId() public {
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://api.test.com",
+            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-2222222-3333333",
             amount: 100 * 10 ** 6,
             shopper: alice
         });
@@ -142,7 +142,7 @@ contract TreasuryTest is BaseTest {
         // Step 1: Create a listing
         uint256 listingAmount = 100 * 10 ** 6;
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://api.etherscan.io/api",
+            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-2345678-9012345",
             amount: listingAmount,
             shopper: alice
         });
@@ -188,7 +188,7 @@ contract TreasuryTest is BaseTest {
         bytes memory purchaseData = abi.encode(
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
-            "https://api.etherscan.io/api",
+            "https://www.amazon.com/gp/your-account/order-details/?orderID=111-3456789-0123456",
             block.timestamp,
             EXPECTED_QUERIES_HASH
         );
@@ -202,7 +202,7 @@ contract TreasuryTest is BaseTest {
     function test_SubmitPurchase_InvalidNotaryFingerprint() public {
         // Create listing
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://api.etherscan.io/api",
+            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-4567890-1234567",
             amount: 100 * 10 ** 6,
             shopper: alice
         });
@@ -231,7 +231,7 @@ contract TreasuryTest is BaseTest {
     function test_SubmitPurchase_InvalidQueriesHash() public {
         // Create listing
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://api.etherscan.io/api",
+            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-5678901-2345678",
             amount: 100 * 10 ** 6,
             shopper: alice
         });
@@ -260,7 +260,7 @@ contract TreasuryTest is BaseTest {
     function test_SubmitPurchase_InvalidMethod() public {
         // Create listing
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://api.etherscan.io/api",
+            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-6789012-3456789",
             amount: 100 * 10 ** 6,
             shopper: alice
         });
@@ -289,7 +289,7 @@ contract TreasuryTest is BaseTest {
     function test_SubmitPurchase_InvalidUrl() public {
         // Create listing
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://api.etherscan.io/api",
+            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-7890123-4567890",
             amount: 100 * 10 ** 6,
             shopper: alice
         });
@@ -304,7 +304,7 @@ contract TreasuryTest is BaseTest {
         bytes memory purchaseData = abi.encode(
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
-            "https://wrong-url.com", // Wrong URL
+            "https://www.amazon.com/gp/your-account/order-details/?orderID=999-9999999-9999999", // Wrong order ID
             block.timestamp,
             EXPECTED_QUERIES_HASH
         );
@@ -318,7 +318,7 @@ contract TreasuryTest is BaseTest {
     function test_SubmitPurchase_ZKProofVerificationFailed() public {
         // Create listing
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://api.etherscan.io/api",
+            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-8901234-5678901",
             amount: 100 * 10 ** 6,
             shopper: alice
         });
@@ -352,13 +352,25 @@ contract TreasuryTest is BaseTest {
         uint256 transferAmount = 100 * 10 ** 6;
         uint256 validAfter = block.timestamp - 1;
         uint256 validBefore = block.timestamp + 1 hours;
-        bytes32 nonce = keccak256("unique-nonce");
+        bytes32 nonce = keccak256("unique-nonce-1");
 
         uint256 aliceBalanceBefore = evvm.getBalance(alice, address(usdc));
         assertGt(aliceBalanceBefore, transferAmount, "Alice doesn't have enough USDC");
 
         uint256 bobBalanceBefore = evvm.getBalance(bob, address(usdc));
 
+        // Alice signs the authorization
+        (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
+            alicePrivateKey,
+            alice,
+            bob,
+            transferAmount,
+            validAfter,
+            validBefore,
+            nonce
+        );
+
+        // Merchant submits the signed authorization
         vm.prank(merchant);
         treasury.transferWithAuthorization(
             alice,
@@ -367,20 +379,109 @@ contract TreasuryTest is BaseTest {
             validAfter,
             validBefore,
             nonce,
-            0,
-            bytes32(0),
-            bytes32(0)
+            v,
+            r,
+            s
         );
 
         assertEq(evvm.getBalance(bob, address(usdc)), bobBalanceBefore + transferAmount);
         assertEq(evvm.getBalance(alice, address(usdc)), aliceBalanceBefore - transferAmount);
     }
 
+    function test_TransferWithAuthorization_InvalidSignature() public {
+        uint256 transferAmount = 100 * 10 ** 6;
+        uint256 validAfter = block.timestamp - 1;
+        uint256 validBefore = block.timestamp + 1 hours;
+        bytes32 nonce = keccak256("unique-nonce-2");
+
+        // Bob signs instead of Alice (wrong signer)
+        (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
+            bobPrivateKey,
+            alice,
+            bob,
+            transferAmount,
+            validAfter,
+            validBefore,
+            nonce
+        );
+
+        vm.prank(merchant);
+        vm.expectRevert(Treasury.InvalidSignature.selector);
+        treasury.transferWithAuthorization(
+            alice,
+            bob,
+            transferAmount,
+            validAfter,
+            validBefore,
+            nonce,
+            v,
+            r,
+            s
+        );
+    }
+
+    function test_TransferWithAuthorization_ReplayProtection() public {
+        uint256 transferAmount = 50 * 10 ** 6;
+        uint256 validAfter = block.timestamp - 1;
+        uint256 validBefore = block.timestamp + 1 hours;
+        bytes32 nonce = keccak256("unique-nonce-3");
+
+        // Alice signs the authorization
+        (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
+            alicePrivateKey,
+            alice,
+            bob,
+            transferAmount,
+            validAfter,
+            validBefore,
+            nonce
+        );
+
+        // First call succeeds
+        vm.prank(merchant);
+        treasury.transferWithAuthorization(
+            alice,
+            bob,
+            transferAmount,
+            validAfter,
+            validBefore,
+            nonce,
+            v,
+            r,
+            s
+        );
+
+        // Second call with same signature should fail (nonce already used)
+        vm.prank(merchant);
+        vm.expectRevert(Treasury.AuthorizationAlreadyUsed.selector);
+        treasury.transferWithAuthorization(
+            alice,
+            bob,
+            transferAmount,
+            validAfter,
+            validBefore,
+            nonce,
+            v,
+            r,
+            s
+        );
+    }
+
     function test_TransferWithAuthorization_Expired_Before() public {
         uint256 transferAmount = 100 * 10 ** 6;
         uint256 validAfter = block.timestamp + 1; // Not yet valid
         uint256 validBefore = block.timestamp + 1 hours;
-        bytes32 nonce = keccak256("unique-nonce");
+        bytes32 nonce = keccak256("unique-nonce-4");
+
+        (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
+            alicePrivateKey,
+            alice,
+            bob,
+            transferAmount,
+            validAfter,
+            validBefore,
+            nonce
+        );
 
         vm.prank(merchant);
         vm.expectRevert(Treasury.Expired.selector);
@@ -391,9 +492,9 @@ contract TreasuryTest is BaseTest {
             validAfter,
             validBefore,
             nonce,
-            0,
-            bytes32(0),
-            bytes32(0)
+            v,
+            r,
+            s
         );
     }
 
@@ -401,7 +502,17 @@ contract TreasuryTest is BaseTest {
         uint256 transferAmount = 100 * 10 ** 6;
         uint256 validAfter = 100;
         uint256 validBefore = 200;
-        bytes32 nonce = keccak256("unique-nonce");
+        bytes32 nonce = keccak256("unique-nonce-5");
+
+        (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
+            alicePrivateKey,
+            alice,
+            bob,
+            transferAmount,
+            validAfter,
+            validBefore,
+            nonce
+        );
 
         vm.warp(300);
 
@@ -414,23 +525,97 @@ contract TreasuryTest is BaseTest {
             validAfter,
             validBefore,
             nonce,
-            0,
-            bytes32(0),
-            bytes32(0)
+            v,
+            r,
+            s
         );
+    }
+
+    // ============ Amazon URL Format Tests ============
+
+    function test_AmazonOrderDetailsUrlFormat() public {
+        uint256 listingAmount = 100 * 10 ** 6;
+        Treasury.Listing memory listing = Treasury.Listing({
+            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-1234567-8901234",
+            amount: listingAmount,
+            shopper: alice
+        });
+
+        vm.startPrank(alice);
+        usdc.approve(address(treasury), listingAmount);
+        treasury.list(listing);
+        vm.stopPrank();
+
+        bytes32 listingId = treasury.calculateId(listing);
+
+        bytes memory purchaseData = abi.encode(
+            EXPECTED_NOTARY_FINGERPRINT,
+            "GET",
+            listing.url,
+            block.timestamp,
+            EXPECTED_QUERIES_HASH
+        );
+        bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
+
+        mockVerifier.setShouldSucceed(true);
+
+        uint256 merchantBalanceBefore = evvm.getBalance(merchant, address(usdc));
+        uint256 aliceBalanceBefore = evvm.getBalance(alice, address(usdc));
+
+        vm.prank(merchant);
+        treasury.submitPurchase(listingId, purchaseData, seal);
+
+        assertEq(evvm.getBalance(alice, address(usdc)), aliceBalanceBefore - listingAmount);
+        assertEq(evvm.getBalance(merchant, address(usdc)), merchantBalanceBefore + listingAmount);
+    }
+
+    function test_AmazonPrintUrlFormat() public {
+        uint256 listingAmount = 100 * 10 ** 6;
+        Treasury.Listing memory listing = Treasury.Listing({
+            url: "https://www.amazon.com/gp/css/summary/print.html?orderID=111-9876543-2109876",
+            amount: listingAmount,
+            shopper: alice
+        });
+
+        vm.startPrank(alice);
+        usdc.approve(address(treasury), listingAmount);
+        treasury.list(listing);
+        vm.stopPrank();
+
+        bytes32 listingId = treasury.calculateId(listing);
+
+        bytes memory purchaseData = abi.encode(
+            EXPECTED_NOTARY_FINGERPRINT,
+            "GET",
+            listing.url,
+            block.timestamp,
+            EXPECTED_QUERIES_HASH
+        );
+        bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
+
+        mockVerifier.setShouldSucceed(true);
+
+        uint256 merchantBalanceBefore = evvm.getBalance(merchant, address(usdc));
+        uint256 aliceBalanceBefore = evvm.getBalance(alice, address(usdc));
+
+        vm.prank(merchant);
+        treasury.submitPurchase(listingId, purchaseData, seal);
+
+        assertEq(evvm.getBalance(alice, address(usdc)), aliceBalanceBefore - listingAmount);
+        assertEq(evvm.getBalance(merchant, address(usdc)), merchantBalanceBefore + listingAmount);
     }
 
     // ============ Multiple Listings Tests ============
 
     function test_MultipleListings() public {
         Treasury.Listing memory listing1 = Treasury.Listing({
-            url: "https://api.etherscan.io/api?address=0x1",
+            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-9012345-6789012",
             amount: 50 * 10 ** 6,
             shopper: alice
         });
 
         Treasury.Listing memory listing2 = Treasury.Listing({
-            url: "https://api.etherscan.io/api?address=0x2",
+            url: "https://www.amazon.com/gp/css/summary/print.html?orderID=111-0123456-7890123",
             amount: 75 * 10 ** 6,
             shopper: alice
         });
@@ -458,7 +643,7 @@ contract TreasuryTest is BaseTest {
         amount = bound(amount, 1, 500 * 10 ** 6);
 
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://api.test.com",
+            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-1111111-1111111",
             amount: amount,
             shopper: alice
         });

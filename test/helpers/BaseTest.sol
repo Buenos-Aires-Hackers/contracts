@@ -184,6 +184,38 @@ abstract contract BaseTest is Test {
         return abi.encodePacked(r, s, v);
     }
 
+    function signTransferAuthorization(
+        uint256 privateKey,
+        address from,
+        address to,
+        uint256 value,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce
+    ) internal view returns (uint8 v, bytes32 r, bytes32 s) {
+        bytes32 TRANSFER_WITH_AUTHORIZATION_TYPEHASH = keccak256(
+            "TransferWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)"
+        );
+
+        bytes32 structHash = keccak256(
+            abi.encode(
+                TRANSFER_WITH_AUTHORIZATION_TYPEHASH,
+                from,
+                to,
+                value,
+                validAfter,
+                validBefore,
+                nonce
+            )
+        );
+
+        bytes32 digest = keccak256(
+            abi.encodePacked("\x19\x01", treasury.DOMAIN_SEPARATOR(), structHash)
+        );
+
+        (v, r, s) = vm.sign(privateKey, digest);
+    }
+
     function expectEmitAddress(address emitter) internal {
         vm.expectEmit(true, true, true, true, emitter);
     }

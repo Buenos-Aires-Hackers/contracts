@@ -41,6 +41,9 @@ contract Treasury {
 
     mapping(bytes32 id => Listing listing) public fetchListing;
 
+    /// @notice Mapping of used nonces for transferWithAuthorization
+    mapping(address => mapping(bytes32 => bool)) public authorizationState;
+
     /// @notice Custom errors
     error InvalidNotaryKeyFingerprint();
     error InvalidQueriesHash();
@@ -49,8 +52,11 @@ contract Treasury {
     error InvalidContributions();
     error Expired();
     error InvalidListing();
+    error AuthorizationAlreadyUsed();
+    error InvalidSignature();
 
     event ListingCreated(Listing listing, bytes32 id);
+    event ListingFinalized(Listing listing, bytes32 id, address buyer);
 
     /// @notice Address of the EVVM core contract
     address public evvmAddress;
@@ -71,6 +77,15 @@ contract Treasury {
 
     address public immutable PAYMENT_TOKEN;
 
+    /// @notice EIP-712 domain separator
+    bytes32 public immutable DOMAIN_SEPARATOR;
+
+    /// @notice EIP-712 typehash for transferWithAuthorization
+    bytes32 public constant TRANSFER_WITH_AUTHORIZATION_TYPEHASH =
+        keccak256(
+            "TransferWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)"
+        );
+
     /**
      * @notice Initialize Treasury with EVVM contract address
      * @param _evvmAddress Address of the EVVM core contract
@@ -89,6 +104,17 @@ contract Treasury {
         EXPECTED_NOTARY_KEY_FINGERPRINT = _expectedNotaryKeyFingerprint;
         EXPECTED_QUERIES_HASH = _expectedQueriesHash;
         PAYMENT_TOKEN = _paymentToken;
+
+        // Initialize EIP-712 domain separator
+        DOMAIN_SEPARATOR = keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(bytes("Treasury")),
+                keccak256(bytes("1")),
+                block.chainid,
+                address(this)
+            )
+        );
     }
 
     /**
@@ -237,6 +263,7 @@ contract Treasury {
                 listing.amount
             );
             delete fetchListing[id];
+            emit ListingFinalized(listing, id, msg.sender);
         } catch {
             revert ZKProofVerificationFailed();
         }
@@ -253,8 +280,38 @@ contract Treasury {
         bytes32 r,
         bytes32 s
     ) external {
+        // Check time validity
         uint256 timestamp = block.timestamp;
         if (timestamp < validAfter || timestamp > validBefore) revert Expired();
+
+        // Check nonce hasn't been used
+        if (authorizationState[from][nonce]) revert AuthorizationAlreadyUsed();
+
+        // Construct the message hash according to EIP-712
+        bytes32 structHash = keccak256(
+            abi.encode(
+                TRANSFER_WITH_AUTHORIZATION_TYPEHASH,
+                from,
+                to,
+                value,
+                validAfter,
+                validBefore,
+                nonce
+            )
+        );
+
+        bytes32 digest = keccak256(
+            abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, structHash)
+        );
+
+        // Recover signer from signature
+        address signer = ecrecover(digest, v, r, s);
+
+        // Verify signature is from 'from' address
+        if (signer != from || signer == address(0)) revert InvalidSignature();
+
+        // Mark nonce as used
+        authorizationState[from][nonce] = true;
 
         // Transfer from 'from' to 'to' by withdrawing from 'from' and crediting 'to'
         if (
