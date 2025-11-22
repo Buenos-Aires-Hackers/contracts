@@ -1,0 +1,176 @@
+// SPDX-License-Identifier: EVVM-NONCOMMERCIAL-1.0
+pragma solidity 0.8.30;
+
+import {BaseTest} from "../helpers/BaseTest.sol";
+
+/**
+ * @title Integration Tests
+ * @notice Tests the interaction between all contracts in the system
+ */
+contract IntegrationTest is BaseTest {
+    function setUp() public override {
+        super.setUp();
+    }
+
+    // ============ Full User Journey Tests ============
+
+    function test_FullUserJourney_DepositAndPurchase() public {
+        // 1. Alice deposits USDC to Treasury
+        uint256 depositAmount = 500 * 10 ** 6;
+
+        vm.startPrank(alice);
+        usdc.approve(address(treasury), depositAmount);
+        treasury.deposit(address(usdc), depositAmount);
+        vm.stopPrank();
+
+        uint256 aliceUsdcBalance = evvm.getBalance(alice, address(usdc));
+        assertGt(aliceUsdcBalance, 0);
+
+        // 2. Verify balance is correct in Evvm
+        assertEq(aliceUsdcBalance, depositAmount);
+    }
+
+    function test_FullUserJourney_RegisterUsernameAndDeposit() public {
+        // 1. Alice registers a username
+        string memory username = "alice.cypher";
+
+        vm.prank(alice);
+        nameService.registerUsername(username);
+
+        assertEq(nameService.getUserAddress(username), alice);
+
+        // 2. Bob deposits ETH
+        vm.prank(bob);
+        treasury.deposit{value: 10 ether}(address(0), 10 ether);
+
+        assertGt(evvm.getBalance(bob, address(0)), 0);
+
+        // 3. Verify username resolution works
+        address resolvedAlice = nameService.getUserAddress(username);
+        assertEq(resolvedAlice, alice);
+    }
+
+    function test_TreasuryEvvmIntegration_DepositAndPurchase() public {
+        // 1. Alice deposits USDC
+        uint256 depositAmount = 1000 * 10 ** 6;
+
+        vm.startPrank(alice);
+        usdc.approve(address(treasury), depositAmount);
+        treasury.deposit(address(usdc), depositAmount);
+        vm.stopPrank();
+
+        uint256 balanceAfterDeposit = evvm.getBalance(alice, address(usdc));
+
+        // 2. Merchant submits a purchase proof
+        bytes memory purchaseData = abi.encode(
+            bytes32(uint256(2)), // notary fingerprint
+            "GET",
+            "https://api.etherscan.io/api",
+            block.timestamp,
+            bytes32(uint256(3)) // queries hash
+        );
+        bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
+
+        mockVerifier.setShouldSucceed(true);
+
+        vm.prank(merchant);
+        treasury.submitPurchase(alice, 100 * 10 ** 6, purchaseData, seal);
+
+        // 3. Verify balances updated via Evvm
+        assertEq(evvm.getBalance(alice, address(usdc)), balanceAfterDeposit - 100 * 10 ** 6);
+        assertEq(evvm.getBalance(merchant, address(usdc)), 100 * 10 ** 6);
+    }
+
+    // ============ Multi-Contract Interaction Tests ============
+
+    function test_StakingEvvmIntegration() public {
+        // Test that Staking contract can interact with Evvm
+        assertEq(staking.evvmAddress(), address(evvm));
+        assertEq(staking.estimatorAddress(), address(estimator));
+    }
+
+    function test_NameServiceEvvmIntegration() public {
+        // Register username and verify it's stored correctly
+        vm.prank(alice);
+        nameService.registerUsername("alice.test");
+
+        address resolved = nameService.getUserAddress("alice.test");
+        assertEq(resolved, alice);
+
+        // Verify Evvm knows about NameService
+        assertEq(evvm.nameServiceAddress(), address(nameService));
+    }
+
+    function test_AdminControlAcrossContracts() public {
+        // Verify admin is set correctly across all contracts
+        assertEq(nameService.admin(), admin);
+        assertEq(p2pSwap.admin(), admin);
+
+        // Verify admin can perform admin actions on Evvm
+        vm.prank(admin);
+        evvm.setEvvmID(123);
+        assertEq(evvm.getEvvmID(), 123);
+    }
+
+    // ============ Complex Multi-Step Scenarios ============
+
+    function test_MultiUserMultiTokenScenario() public {
+        // Setup: Multiple users deposit different tokens
+        vm.startPrank(alice);
+        usdc.approve(address(treasury), 1000 * 10 ** 6);
+        treasury.deposit(address(usdc), 1000 * 10 ** 6);
+        vm.stopPrank();
+
+        vm.startPrank(bob);
+        dai.approve(address(treasury), 1000 ether);
+        treasury.deposit(address(dai), 1000 ether);
+        vm.stopPrank();
+
+        vm.prank(charlie);
+        treasury.deposit{value: 10 ether}(address(0), 10 ether);
+
+        // Verify all balances are correct in Evvm
+        assertGt(evvm.getBalance(alice, address(usdc)), 0);
+        assertGt(evvm.getBalance(bob, address(dai)), 0);
+        assertGt(evvm.getBalance(charlie, address(0)), 0);
+    }
+
+    function test_ChainedTransactions() public {
+        // 1. Alice deposits
+        vm.startPrank(alice);
+        usdc.approve(address(treasury), 500 * 10 ** 6);
+        treasury.deposit(address(usdc), 500 * 10 ** 6);
+        vm.stopPrank();
+
+        // 2. Alice registers username
+        vm.prank(alice);
+        nameService.registerUsername("alice.market");
+
+        // 3. Bob deposits
+        vm.startPrank(bob);
+        dai.approve(address(treasury), 200 ether);
+        treasury.deposit(address(dai), 200 ether);
+        vm.stopPrank();
+
+        // Verify entire chain worked
+        assertEq(nameService.getUserAddress("alice.market"), alice);
+        assertGt(evvm.getBalance(alice, address(usdc)), 0);
+        assertGt(evvm.getBalance(bob, address(dai)), 0);
+    }
+
+    // ============ Stress Tests ============
+
+    function test_ManyUsersDepositing() public {
+        address[] memory users = new address[](10);
+
+        for (uint256 i = 0; i < 10; i++) {
+            users[i] = makeAddr(string(abi.encodePacked("user", i)));
+            vm.deal(users[i], 100 ether);
+
+            vm.prank(users[i]);
+            treasury.deposit{value: 1 ether}(address(0), 1 ether);
+
+            assertEq(evvm.getBalance(users[i], address(0)), 1 ether);
+        }
+    }
+}

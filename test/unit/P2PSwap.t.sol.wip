@@ -1,0 +1,69 @@
+// SPDX-License-Identifier: EVVM-NONCOMMERCIAL-1.0
+pragma solidity 0.8.30;
+
+import {BaseTest} from "../helpers/BaseTest.sol";
+import {P2PSwap} from "@evvm/testnet-contracts/contracts/p2pSwap/P2PSwap.sol";
+
+contract P2PSwapTest is BaseTest {
+    function setUp() public override {
+        super.setUp();
+    }
+
+    // ============ Constructor Tests ============
+
+    function test_Constructor() public {
+        assertEq(p2pSwap.evvmAddress(), address(evvm));
+        assertEq(p2pSwap.stakingAddress(), address(staking));
+        assertEq(p2pSwap.admin(), admin);
+    }
+
+    // ============ Staking Tests ============
+
+    function test_Stake() public {
+        uint256 stakeAmount = 100 ether;
+
+        // Give alice some principal tokens
+        vm.startPrank(address(treasury));
+        evvm.addAmountToUser(alice, address(evvm), stakeAmount);
+        vm.stopPrank();
+
+        vm.prank(alice);
+        p2pSwap.stake(stakeAmount);
+
+        // Verify staking succeeded (implementation dependent)
+    }
+
+    function test_Unstake() public {
+        uint256 stakeAmount = 100 ether;
+
+        // Setup: first stake
+        vm.startPrank(address(treasury));
+        evvm.addAmountToUser(alice, address(evvm), stakeAmount);
+        vm.stopPrank();
+
+        vm.prank(alice);
+        p2pSwap.stake(stakeAmount);
+
+        // Then unstake
+        vm.prank(alice);
+        p2pSwap.unstake(stakeAmount);
+    }
+
+    // ============ Admin Tests ============
+
+    function test_ProposeOwner() public {
+        address newOwner = makeAddr("newOwner");
+
+        vm.prank(admin);
+        p2pSwap.proposeOwner(newOwner);
+
+        // Verify proposal was created (implementation dependent)
+    }
+
+    // ============ Integration Tests ============
+
+    function test_P2PSwapWithEvvm() public {
+        assertEq(p2pSwap.evvmAddress(), address(evvm));
+        assertEq(p2pSwap.stakingAddress(), address(staking));
+    }
+}

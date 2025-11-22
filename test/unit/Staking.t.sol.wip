@@ -1,0 +1,79 @@
+// SPDX-License-Identifier: EVVM-NONCOMMERCIAL-1.0
+pragma solidity 0.8.30;
+
+import {BaseTest} from "../helpers/BaseTest.sol";
+import {Staking} from "@evvm/testnet-contracts/contracts/staking/Staking.sol";
+import {ErrorsLib} from "@evvm/testnet-contracts/contracts/staking/lib/ErrorsLib.sol";
+
+contract StakingTest is BaseTest {
+    event Staked(address indexed user, uint256 amount);
+    event Unstaked(address indexed user, uint256 amount);
+
+    function setUp() public override {
+        super.setUp();
+    }
+
+    // ============ Constructor Tests ============
+
+    function test_Constructor() public {
+        assertEq(staking.admin(), admin);
+        assertEq(staking.goldenFisher(), goldenFisher);
+    }
+
+    // ============ Staking Tests ============
+
+    function test_Stake() public {
+        uint256 stakeAmount = 100 ether;
+        uint256 initialBalance = evvm.getBalance(alice, address(evvm));
+
+        assertTrue(initialBalance >= stakeAmount, "Insufficient balance to stake");
+
+        // Note: Actual staking implementation details may vary
+        // This is a placeholder test structure
+    }
+
+    function test_Unstake() public {
+        // Setup: First stake some tokens
+        uint256 stakeAmount = 100 ether;
+
+        // Then unstake
+        // Note: Implementation details depend on the actual Staking contract
+    }
+
+    function test_GetStakerInfo() public {
+        // Test retrieving staker information
+        // Implementation depends on Staking contract structure
+    }
+
+    // ============ Admin Tests ============
+
+    function test_AdminFunctions() public {
+        // Test admin-only functions
+        // Implementation depends on what admin functions exist
+    }
+
+    // ============ Golden Fisher Tests ============
+
+    function test_GoldenFisherPrivileges() public {
+        assertEq(staking.goldenFisher(), goldenFisher);
+    }
+
+    // ============ Integration Tests ============
+
+    function test_StakingWithEvvm() public {
+        // Test integration between Staking and Evvm contracts
+        assertEq(staking.evvmAddress(), address(evvm));
+    }
+
+    function test_StakingWithEstimator() public {
+        // Test integration between Staking and Estimator
+        assertEq(staking.estimatorAddress(), address(estimator));
+    }
+
+    // ============ Fuzz Tests ============
+
+    function test_Stake_Fuzz(uint256 amount) public {
+        amount = bound(amount, 1 ether, 1000 ether);
+        // Fuzz test for staking various amounts
+    }
+}

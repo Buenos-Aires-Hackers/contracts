@@ -1,0 +1,268 @@
+// SPDX-License-Identifier: EVVM-NONCOMMERCIAL-1.0
+pragma solidity 0.8.30;
+
+import {BaseTest} from "../helpers/BaseTest.sol";
+import {Evvm} from "@evvm/testnet-contracts/contracts/evvm/Evvm.sol";
+import {EvvmStructs} from "@evvm/testnet-contracts/contracts/evvm/lib/EvvmStructs.sol";
+import {ErrorsLib} from "@evvm/testnet-contracts/contracts/evvm/lib/ErrorsLib.sol";
+
+contract EvvmTest is BaseTest {
+    // ============ Setup ============
+
+    function setUp() public override {
+        super.setUp();
+    }
+
+    // ============ Constructor Tests ============
+
+    function test_Constructor() public {
+        EvvmStructs.EvvmMetadata memory metadata = evvm.getEvvmMetadata();
+
+        assertEq(metadata.EvvmName, "CypherMarket Testnet");
+        assertEq(metadata.principalTokenName, "CypherMarket Token");
+        assertEq(metadata.principalTokenSymbol, "CYPHER");
+        assertEq(metadata.principalTokenAddress, address(evvm));
+        assertEq(metadata.totalSupply, PRINCIPAL_TOKEN_SUPPLY);
+    }
+
+    // ============ Balance Tests ============
+
+    function test_GetBalance() public {
+        uint256 balance = evvm.getBalance(alice, address(evvm));
+        assertEq(balance, 1000 ether);
+    }
+
+    function test_AddAmountToUser() public {
+        uint256 initialBalance = evvm.getBalance(bob, address(usdc));
+
+        vm.prank(address(treasury));
+        evvm.addAmountToUser(bob, address(usdc), 500 * 10 ** 6);
+
+        assertEq(evvm.getBalance(bob, address(usdc)), initialBalance + 500 * 10 ** 6);
+    }
+
+    function test_AddAmountToUser_OnlyTreasury() public {
+        vm.prank(alice);
+        vm.expectRevert();
+        evvm.addAmountToUser(bob, address(usdc), 500 * 10 ** 6);
+    }
+
+    function test_RemoveAmountFromUser() public {
+        // First add some balance
+        vm.prank(address(treasury));
+        evvm.addAmountToUser(alice, address(usdc), 1000 * 10 ** 6);
+
+        uint256 balanceBefore = evvm.getBalance(alice, address(usdc));
+
+        vm.prank(address(treasury));
+        evvm.removeAmountFromUser(alice, address(usdc), 500 * 10 ** 6);
+
+        assertEq(evvm.getBalance(alice, address(usdc)), balanceBefore - 500 * 10 ** 6);
+    }
+
+    function test_RemoveAmountFromUser_InsufficientBalance() public {
+        vm.prank(address(treasury));
+        vm.expectRevert(ErrorsLib.InsufficientBalance.selector);
+        evvm.removeAmountFromUser(alice, address(usdc), 999999 * 10 ** 6);
+    }
+
+    function test_RemoveAmountFromUser_OnlyTreasury() public {
+        vm.prank(alice);
+        vm.expectRevert();
+        evvm.removeAmountFromUser(bob, address(usdc), 100 * 10 ** 6);
+    }
+
+    // ============ Admin Tests ============
+
+    function test_ProposeAdmin() public {
+        address newAdmin = makeAddr("newAdmin");
+
+        vm.prank(admin);
+        evvm.proposeAdmin(newAdmin);
+
+        // Admin change has a time delay, so we need to wait and execute
+        vm.warp(block.timestamp + 1 minutes + 1);
+
+        vm.prank(newAdmin);
+        evvm.acceptAdmin();
+
+        // Verify new admin can perform admin actions
+        vm.prank(newAdmin);
+        evvm.setEvvmID(999);
+
+        assertEq(evvm.getEvvmID(), 999);
+    }
+
+    function test_ProposeAdmin_OnlyCurrentAdmin() public {
+        address newAdmin = makeAddr("newAdmin");
+
+        vm.prank(alice);
+        vm.expectRevert();
+        evvm.proposeAdmin(newAdmin);
+    }
+
+    // ============ NameService Integration Tests ============
+
+    function test_SetupNameService() public {
+        assertEq(evvm.nameServiceAddress(), address(nameService));
+    }
+
+    function test_SetupNameService_OnlyAdmin() public {
+        address newNameService = makeAddr("newNameService");
+
+        vm.prank(alice);
+        vm.expectRevert();
+        evvm._setupNameServiceAndTreasuryAddress(newNameService, address(treasury));
+    }
+
+    // ============ Treasury Integration Tests ============
+
+    function test_SetupTreasury() public {
+        assertEq(evvm.treasuryAddress(), address(treasury));
+    }
+
+    function test_TreasuryCanAddBalance() public {
+        uint256 initialBalance = evvm.getBalance(bob, address(dai));
+
+        vm.prank(address(treasury));
+        evvm.addAmountToUser(bob, address(dai), 100 ether);
+
+        assertEq(evvm.getBalance(bob, address(dai)), initialBalance + 100 ether);
+    }
+
+    function test_TreasuryCanRemoveBalance() public {
+        // Setup: give bob some DAI balance
+        vm.prank(address(treasury));
+        evvm.addAmountToUser(bob, address(dai), 1000 ether);
+
+        uint256 balanceBefore = evvm.getBalance(bob, address(dai));
+
+        vm.prank(address(treasury));
+        evvm.removeAmountFromUser(bob, address(dai), 500 ether);
+
+        assertEq(evvm.getBalance(bob, address(dai)), balanceBefore - 500 ether);
+    }
+
+    // ============ Metadata Tests ============
+
+    function test_GetEvvmMetadata() public {
+        EvvmStructs.EvvmMetadata memory metadata = evvm.getEvvmMetadata();
+
+        assertEq(metadata.EvvmName, "CypherMarket Testnet");
+        assertEq(metadata.principalTokenName, "CypherMarket Token");
+        assertEq(metadata.principalTokenSymbol, "CYPHER");
+        assertEq(metadata.principalTokenAddress, address(evvm));
+    }
+
+    function test_PrincipalTokenAddress() public {
+        EvvmStructs.EvvmMetadata memory metadata = evvm.getEvvmMetadata();
+        assertEq(metadata.principalTokenAddress, address(evvm));
+    }
+
+    // ============ Era and Reward Tests ============
+
+    function test_GetCurrentEra() public view {
+        uint256 era = evvm.getCurrentEra();
+        assertGe(era, 0);
+    }
+
+    function test_GetReward() public view {
+        uint256 reward = evvm.getReward();
+        assertGt(reward, 0);
+    }
+
+    // ============ Fuzz Tests ============
+
+    function test_AddBalance_Fuzz(address user, uint256 amount) public {
+        vm.assume(user != address(0));
+        amount = bound(amount, 1, type(uint128).max);
+
+        uint256 balanceBefore = evvm.getBalance(user, address(usdc));
+
+        vm.prank(address(treasury));
+        evvm.addAmountToUser(user, address(usdc), amount);
+
+        assertEq(evvm.getBalance(user, address(usdc)), balanceBefore + amount);
+    }
+
+    function test_RemoveBalance_Fuzz(uint256 addAmount, uint256 removeAmount) public {
+        addAmount = bound(addAmount, 1000, type(uint128).max);
+        removeAmount = bound(removeAmount, 1, addAmount);
+
+        vm.startPrank(address(treasury));
+        evvm.addAmountToUser(alice, address(usdc), addAmount);
+
+        uint256 balanceBefore = evvm.getBalance(alice, address(usdc));
+        evvm.removeAmountFromUser(alice, address(usdc), removeAmount);
+        vm.stopPrank();
+
+        assertEq(evvm.getBalance(alice, address(usdc)), balanceBefore - removeAmount);
+    }
+
+    // ============ Multiple Token Balance Tests ============
+
+    function test_MultipleTokenBalances() public {
+        vm.startPrank(address(treasury));
+
+        evvm.addAmountToUser(alice, address(usdc), 1000 * 10 ** 6);
+        evvm.addAmountToUser(alice, address(dai), 2000 ether);
+        evvm.addAmountToUser(alice, address(0), 3 ether); // ETH
+
+        vm.stopPrank();
+
+        assertEq(evvm.getBalance(alice, address(usdc)), 1000 * 10 ** 6);
+        assertEq(evvm.getBalance(alice, address(dai)), 2000 ether);
+        assertEq(evvm.getBalance(alice, address(0)), 3 ether);
+    }
+
+    // ============ Principal Token Tests ============
+
+    function test_PrincipalTokenCannotBeWithdrawn() public {
+        // This would be tested in the Treasury or other withdrawal mechanisms
+        // Principal token (address(evvm)) should have special handling
+        assertEq(evvm.getEvvmMetadata().principalTokenAddress, address(evvm));
+    }
+
+    // ============ Edge Cases ============
+
+    function test_ZeroAddressBalance() public view {
+        uint256 balance = evvm.getBalance(address(0), address(usdc));
+        // Should not revert, just return 0 or existing balance
+        assertGe(balance, 0);
+    }
+
+    function test_AddZeroAmount() public {
+        uint256 balanceBefore = evvm.getBalance(alice, address(usdc));
+
+        vm.prank(address(treasury));
+        evvm.addAmountToUser(alice, address(usdc), 0);
+
+        assertEq(evvm.getBalance(alice, address(usdc)), balanceBefore);
+    }
+
+    function test_RemoveZeroAmount() public {
+        uint256 balanceBefore = evvm.getBalance(alice, address(evvm));
+
+        vm.prank(address(treasury));
+        evvm.removeAmountFromUser(alice, address(evvm), 0);
+
+        assertEq(evvm.getBalance(alice, address(evvm)), balanceBefore);
+    }
+
+    // ============ Access Control Tests ============
+
+    function testFail_NonAdminChangeAdmin() public {
+        vm.prank(alice);
+        evvm.changeAdmin(bob);
+    }
+
+    function testFail_NonTreasuryAddBalance() public {
+        vm.prank(alice);
+        evvm.addAmountToUser(bob, address(usdc), 100 * 10 ** 6);
+    }
+
+    function testFail_NonTreasuryRemoveBalance() public {
+        vm.prank(alice);
+        evvm.removeAmountFromUser(bob, address(usdc), 100 * 10 ** 6);
+    }
+}

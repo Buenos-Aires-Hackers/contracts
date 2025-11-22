@@ -81,7 +81,8 @@ contract Treasury {
         bytes32 _imageId,
         bytes32 _expectedNotaryKeyFingerprint,
         bytes32 _expectedQueriesHash,
-        string memory _expectedUrlPattern
+        string memory _expectedUrlPattern,
+        address _paymentToken
     ) {
         evvmAddress = _evvmAddress;
         VERIFIER = IRiscZeroVerifier(_verifier);
@@ -89,6 +90,7 @@ contract Treasury {
         EXPECTED_NOTARY_KEY_FINGERPRINT = _expectedNotaryKeyFingerprint;
         EXPECTED_QUERIES_HASH = _expectedQueriesHash;
         expectedUrlPattern = _expectedUrlPattern;
+        PAYMENT_TOKEN = _paymentToken;
     }
 
     /**
@@ -237,6 +239,21 @@ contract Treasury {
     ) external {
         uint256 timestamp = block.timestamp;
         if (timestamp < validAfter || timestamp > validBefore) revert Expired();
-        _withdraw(to, PAYMENT_TOKEN, value);
+
+        // Transfer from 'from' to 'to' by withdrawing from 'from' and crediting 'to'
+        if (
+            PAYMENT_TOKEN == Evvm(evvmAddress).getEvvmMetadata().principalTokenAddress
+        ) {
+            revert ErrorsLib.PrincipalTokenIsNotWithdrawable();
+        }
+
+        if (Evvm(evvmAddress).getBalance(from, PAYMENT_TOKEN) < value) {
+            revert ErrorsLib.InsufficientBalance();
+        }
+
+        // Remove from sender
+        Evvm(evvmAddress).removeAmountFromUser(from, PAYMENT_TOKEN, value);
+        // Add to recipient
+        Evvm(evvmAddress).addAmountToUser(to, PAYMENT_TOKEN, value);
     }
 }

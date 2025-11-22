@@ -1,0 +1,160 @@
+// SPDX-License-Identifier: EVVM-NONCOMMERCIAL-1.0
+pragma solidity 0.8.30;
+
+import {BaseTest} from "../helpers/BaseTest.sol";
+import {NameService} from "@evvm/testnet-contracts/contracts/nameService/NameService.sol";
+import {ErrorsLib} from "@evvm/testnet-contracts/contracts/nameService/lib/ErrorsLib.sol";
+
+contract NameServiceTest is BaseTest {
+    event UsernameRegistered(address indexed user, string username);
+    event UsernameTransferred(address indexed from, address indexed to, string username);
+
+    function setUp() public override {
+        super.setUp();
+    }
+
+    // ============ Constructor Tests ============
+
+    function test_Constructor() public {
+        assertEq(nameService.evvmAddress(), address(evvm));
+        assertEq(nameService.admin(), admin);
+    }
+
+    // ============ Username Registration Tests ============
+
+    function test_RegisterUsername() public {
+        string memory username = "alice.cypher";
+
+        vm.prank(alice);
+        nameService.registerUsername(username);
+
+        assertEq(nameService.getUsernameOwner(username), alice);
+        assertEq(nameService.getUserAddress(username), alice);
+    }
+
+    function test_RegisterUsername_AlreadyTaken() public {
+        string memory username = "alice.cypher";
+
+        vm.prank(alice);
+        nameService.registerUsername(username);
+
+        vm.prank(bob);
+        vm.expectRevert();
+        nameService.registerUsername(username);
+    }
+
+    function test_RegisterUsername_EmptyString() public {
+        vm.prank(alice);
+        vm.expectRevert();
+        nameService.registerUsername("");
+    }
+
+    function test_RegisterMultipleUsernames() public {
+        vm.prank(alice);
+        nameService.registerUsername("alice1.cypher");
+
+        vm.prank(alice);
+        nameService.registerUsername("alice2.cypher");
+
+        assertEq(nameService.getUserAddress("alice1.cypher"), alice);
+        assertEq(nameService.getUserAddress("alice2.cypher"), alice);
+    }
+
+    // ============ Username Transfer Tests ============
+
+    function test_TransferUsername() public {
+        string memory username = "alice.cypher";
+
+        vm.prank(alice);
+        nameService.registerUsername(username);
+
+        vm.prank(alice);
+        nameService.transferUsername(username, bob);
+
+        assertEq(nameService.getUsernameOwner(username), bob);
+    }
+
+    function test_TransferUsername_NotOwner() public {
+        string memory username = "alice.cypher";
+
+        vm.prank(alice);
+        nameService.registerUsername(username);
+
+        vm.prank(bob);
+        vm.expectRevert();
+        nameService.transferUsername(username, charlie);
+    }
+
+    // ============ Lookup Tests ============
+
+    function test_GetUserAddress() public {
+        string memory username = "bob.cypher";
+
+        vm.prank(bob);
+        nameService.registerUsername(username);
+
+        address resolvedAddress = nameService.getUserAddress(username);
+        assertEq(resolvedAddress, bob);
+    }
+
+    function test_GetUserAddress_NonExistent() public {
+        address resolvedAddress = nameService.getUserAddress("nonexistent.cypher");
+        assertEq(resolvedAddress, address(0));
+    }
+
+    // ============ Admin Tests ============
+
+    function test_AdminCanModify() public {
+        // Test admin-specific functions if they exist
+    }
+
+    // ============ Integration Tests ============
+
+    function test_NameServiceWithEvvm() public {
+        string memory username = "alice.cypher";
+
+        vm.prank(alice);
+        nameService.registerUsername(username);
+
+        // Verify Evvm can resolve the username
+        address resolved = nameService.getUserAddress(username);
+        assertEq(resolved, alice);
+    }
+
+    // ============ Fuzz Tests ============
+
+    function test_RegisterUsername_Fuzz(string memory username) public {
+        vm.assume(bytes(username).length > 0 && bytes(username).length < 100);
+
+        vm.prank(alice);
+        try nameService.registerUsername(username) {
+            assertEq(nameService.getUserAddress(username), alice);
+        } catch {
+            // Some usernames may be invalid
+        }
+    }
+
+    // ============ Edge Cases ============
+
+    function test_CaseInsensitiveUsernames() public {
+        // Test if usernames are case-sensitive or insensitive
+        vm.prank(alice);
+        nameService.registerUsername("Alice.cypher");
+
+        // Depending on implementation, this might fail or succeed
+        vm.prank(bob);
+        try nameService.registerUsername("alice.cypher") {
+            // Case insensitive - should fail
+            revert("Should have failed");
+        } catch {
+            // Case sensitive - should succeed
+        }
+    }
+
+    function test_SpecialCharactersInUsername() public {
+        vm.prank(alice);
+        try nameService.registerUsername("alice@#$.cypher") {} catch {
+            // Special characters might not be allowed
+        }
+    }
+}
