@@ -212,11 +212,10 @@ contract Treasury {
             bytes32 notaryKeyFingerprint,
             string memory method,
             string memory url,
-            uint256 timestamp,
             bytes32 queriesHash
         ) = abi.decode(
                 purchaseData,
-                (bytes32, string, string, uint256, bytes32)
+                (bytes32, string, string, bytes32)
             );
 
         Listing memory listing = fetchListing[id];

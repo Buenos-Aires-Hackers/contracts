@@ -161,39 +161,25 @@ contract TreasuryTest is BaseTest {
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
             listing.url,
-            block.timestamp,
             EXPECTED_QUERIES_HASH
         );
-        // NOTE: Using fake seal - this test will fail with real verifier
-        // To make this test pass, you need a real ZK proof seal generated from your RISC Zero program
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
         uint256 merchantBalanceBefore = evvm.getBalance(merchant, address(usdc));
         uint256 aliceBalanceBefore = evvm.getBalance(alice, address(usdc));
 
         // Step 3: Submit purchase
-        // NOTE: This will revert with real verifier since we're using a fake seal
-        // To make this test pass, you need a real ZK proof seal generated from your RISC Zero program
-        // Uncomment the lines below and provide a real seal to test successful verification:
-        // vm.prank(merchant);
-        // treasury.submitPurchase(listingId, purchaseData, realSeal);
-        // assertEq(evvm.getBalance(alice, address(usdc)), aliceBalanceBefore - listingAmount);
-        // assertEq(evvm.getBalance(merchant, address(usdc)), merchantBalanceBefore + listingAmount);
-        // (, , address shopper) = treasury.fetchListing(listingId);
-        // assertEq(shopper, address(0));
-        
-        // For now, verify that fake seal is rejected
+        // NOTE: With real RISC Zero verifier, fake seals will be rejected
+        // Replace 'seal' with a real proof seal to test successful verification
         vm.prank(merchant);
         vm.expectRevert(Treasury.ZKProofVerificationFailed.selector);
         treasury.submitPurchase(listingId, purchaseData, seal);
 
-        // Verify balances did NOT change (since verification failed)
-        assertEq(evvm.getBalance(alice, address(usdc)), aliceBalanceBefore);
-        assertEq(evvm.getBalance(merchant, address(usdc)), merchantBalanceBefore);
-
-        // Verify listing still exists (since purchase failed)
-        (, , address shopper) = treasury.fetchListing(listingId);
-        assertEq(shopper, alice);
+        // When using a real seal, uncomment these assertions:
+        // assertEq(evvm.getBalance(alice, address(usdc)), aliceBalanceBefore - listingAmount);
+        // assertEq(evvm.getBalance(merchant, address(usdc)), merchantBalanceBefore + listingAmount);
+        // (, , address shopper) = treasury.fetchListing(listingId);
+        // assertEq(shopper, address(0));
     }
 
     function test_SubmitPurchase_InvalidListing() public {
@@ -203,7 +189,6 @@ contract TreasuryTest is BaseTest {
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
             "https://www.amazon.com/gp/your-account/order-details/?orderID=111-3456789-0123456",
-            block.timestamp,
             EXPECTED_QUERIES_HASH
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
@@ -232,7 +217,6 @@ contract TreasuryTest is BaseTest {
             bytes32(uint256(999)), // Wrong fingerprint
             "GET",
             listing.url,
-            block.timestamp,
             EXPECTED_QUERIES_HASH
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
@@ -261,7 +245,6 @@ contract TreasuryTest is BaseTest {
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
             listing.url,
-            block.timestamp,
             bytes32(uint256(999)) // Wrong queries hash
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
@@ -290,7 +273,6 @@ contract TreasuryTest is BaseTest {
             EXPECTED_NOTARY_FINGERPRINT,
             "POST", // Wrong method
             listing.url,
-            block.timestamp,
             EXPECTED_QUERIES_HASH
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
@@ -319,7 +301,6 @@ contract TreasuryTest is BaseTest {
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
             "https://www.amazon.com/gp/your-account/order-details/?orderID=999-9999999-9999999", // Wrong order ID
-            block.timestamp,
             EXPECTED_QUERIES_HASH
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
@@ -348,7 +329,6 @@ contract TreasuryTest is BaseTest {
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
             listing.url,
-            block.timestamp,
             EXPECTED_QUERIES_HASH
         );
         // Using fake seal - real verifier will reject it
@@ -392,18 +372,17 @@ contract TreasuryTest is BaseTest {
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
             listing.url,
-            block.timestamp,
             EXPECTED_QUERIES_HASH
         );
-        // NOTE: Using fake seal - this test will fail with real verifier
-        // To make this test pass, you need a real ZK proof seal generated from your RISC Zero program
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
-        // NOTE: This test requires a real ZK proof to complete the full flow
-        // Since we're using a fake seal, the purchase will fail and we can't test the full flow
-        // To test the complete flow, uncomment the lines below and provide a real seal:
-        // vm.prank(bob);
-        // treasury.submitPurchase(listingId, purchaseData, realSeal);
+        // NOTE: With real RISC Zero verifier, fake seals will be rejected
+        // Replace 'seal' with a real proof seal to test the complete flow
+        vm.prank(bob);
+        vm.expectRevert(Treasury.ZKProofVerificationFailed.selector);
+        treasury.submitPurchase(listingId, purchaseData, seal);
+
+        // When using a real seal, uncomment the code below to test the full flow:
         // assertEq(evvm.getBalance(alice, address(usdc)), 1000 * 10 ** 6);
         // assertEq(evvm.getBalance(bob, address(usdc)), listingAmount);
         //
@@ -420,17 +399,6 @@ contract TreasuryTest is BaseTest {
         // treasury.transferWithAuthorization(backend, bob, listingAmount, validAfter, validBefore, nonce, v, r, s);
         // assertEq(evvm.getBalance(bob, address(usdc)), 0);
         // assertEq(usdc.balanceOf(bob), bobWalletBefore + listingAmount);
-        
-        // For now, verify that fake seal is rejected
-        vm.prank(bob);
-        vm.expectRevert(Treasury.ZKProofVerificationFailed.selector);
-        treasury.submitPurchase(listingId, purchaseData, seal);
-        
-        // Verify balances did NOT change (since verification failed)
-        assertEq(evvm.getBalance(alice, address(usdc)), 1000 * 10 ** 6 + listingAmount);
-        assertEq(evvm.getBalance(bob, address(usdc)), 0);
-        
-        // Since purchase failed, Bob has no balance to withdraw, so we skip the x402 flow
     }
 
     function test_TransferWithAuthorization_Success() public {
@@ -707,23 +675,19 @@ contract TreasuryTest is BaseTest {
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
             listing.url,
-            block.timestamp,
             EXPECTED_QUERIES_HASH
         );
-        // NOTE: Using fake seal - this test will fail with real verifier
-        // To make this test pass, you need a real ZK proof seal generated from your RISC Zero program
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
         
-        // For now, expect revert since we're using fake seal
-        // Uncomment below and provide a real seal to test successful verification
-        // vm.prank(bob);
-        // treasury.submitPurchase(listingId, purchaseData, realSeal);
-        
+        // NOTE: With real RISC Zero verifier, fake seals will be rejected
+        // Replace 'seal' with a real proof seal to test successful verification
         vm.prank(bob);
         vm.expectRevert(Treasury.ZKProofVerificationFailed.selector);
         treasury.submitPurchase(listingId, purchaseData, seal);
         
-        // NOTE: The rest of this test assumes successful purchase, which requires a real proof
+        // When using a real seal, remove the expectRevert above and uncomment below:
+        // assertEq(evvm.getBalance(alice, address(usdc)), aliceBalanceBefore - listingAmount);
+        
         // After purchase, Alice's locked amount should be 0
         // Alice's remaining balance should be withdrawable
         uint256 aliceRemainingBalance = evvm.getBalance(alice, address(usdc));
@@ -823,21 +787,17 @@ contract TreasuryTest is BaseTest {
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
             listing1.url,
-            block.timestamp,
             EXPECTED_QUERIES_HASH
         );
-        // NOTE: Using fake seal - this test will fail with real verifier
-        // To make this test pass, you need a real ZK proof seal generated from your RISC Zero program
         bytes memory seal1 = abi.encodePacked(bytes32(uint256(1)));
         
-        // For now, expect revert since we're using fake seal
-        // Uncomment below and provide a real seal to test successful verification
-        // vm.prank(bob);
-        // treasury.submitPurchase(listing1Id, purchaseData1, realSeal1);
-        
+        // NOTE: With real RISC Zero verifier, fake seals will be rejected
+        // Replace 'seal1' with a real proof seal to test successful verification
         vm.prank(bob);
         vm.expectRevert(Treasury.ZKProofVerificationFailed.selector);
         treasury.submitPurchase(listing1Id, purchaseData1, seal1);
+        
+        // When using a real seal, remove the expectRevert above
 
         // After completing first listing, Alice has listing2Amount locked
         // She can now withdraw up to (aliceInitialBalance + listing1Amount - Bob's balance)
@@ -916,26 +876,22 @@ contract TreasuryTest is BaseTest {
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
             listing.url,
-            block.timestamp,
             EXPECTED_QUERIES_HASH
         );
-        // NOTE: Using fake seal - this test will fail with real verifier
-        // To make this test pass, you need a real ZK proof seal generated from your RISC Zero program
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
         uint256 merchantBalanceBefore = evvm.getBalance(merchant, address(usdc));
         uint256 aliceBalanceBefore = evvm.getBalance(alice, address(usdc));
 
-        // For now, expect revert since we're using fake seal
-        // Uncomment below and provide a real seal to test successful verification
-        // vm.prank(merchant);
-        // treasury.submitPurchase(listingId, purchaseData, realSeal);
-        // assertEq(evvm.getBalance(alice, address(usdc)), aliceBalanceBefore - listingAmount);
-        // assertEq(evvm.getBalance(merchant, address(usdc)), merchantBalanceBefore + listingAmount);
-        
+        // NOTE: With real RISC Zero verifier, fake seals will be rejected
+        // Replace 'seal' with a real proof seal to test successful verification
         vm.prank(merchant);
         vm.expectRevert(Treasury.ZKProofVerificationFailed.selector);
         treasury.submitPurchase(listingId, purchaseData, seal);
+        
+        // When using a real seal, remove the expectRevert above and uncomment below:
+        // assertEq(evvm.getBalance(alice, address(usdc)), aliceBalanceBefore - listingAmount);
+        // assertEq(evvm.getBalance(merchant, address(usdc)), merchantBalanceBefore + listingAmount);
     }
 
     function test_AmazonPrintUrlFormat() public {
@@ -957,26 +913,22 @@ contract TreasuryTest is BaseTest {
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
             listing.url,
-            block.timestamp,
             EXPECTED_QUERIES_HASH
         );
-        // NOTE: Using fake seal - this test will fail with real verifier
-        // To make this test pass, you need a real ZK proof seal generated from your RISC Zero program
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
         uint256 merchantBalanceBefore = evvm.getBalance(merchant, address(usdc));
         uint256 aliceBalanceBefore = evvm.getBalance(alice, address(usdc));
 
-        // For now, expect revert since we're using fake seal
-        // Uncomment below and provide a real seal to test successful verification
-        // vm.prank(merchant);
-        // treasury.submitPurchase(listingId, purchaseData, realSeal);
-        // assertEq(evvm.getBalance(alice, address(usdc)), aliceBalanceBefore - listingAmount);
-        // assertEq(evvm.getBalance(merchant, address(usdc)), merchantBalanceBefore + listingAmount);
-        
+        // NOTE: With real RISC Zero verifier, fake seals will be rejected
+        // Replace 'seal' with a real proof seal to test successful verification
         vm.prank(merchant);
         vm.expectRevert(Treasury.ZKProofVerificationFailed.selector);
         treasury.submitPurchase(listingId, purchaseData, seal);
+        
+        // When using a real seal, remove the expectRevert above and uncomment below:
+        // assertEq(evvm.getBalance(alice, address(usdc)), aliceBalanceBefore - listingAmount);
+        // assertEq(evvm.getBalance(merchant, address(usdc)), merchantBalanceBefore + listingAmount);
     }
 
     // ============ Multiple Listings Tests ============

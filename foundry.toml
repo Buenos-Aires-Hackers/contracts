@@ -23,7 +23,10 @@ remappings = [
 solc = "0.8.30"
 optimizer-runs = 300
 via_ir = true
-fs_permissions = [{ access = "read", path = "./input" }]
+fs_permissions = [
+    { access = "read", path = "./input" },
+    { access = "read", path = "./target" }
+]
 
 # Fork configuration for Base Sepolia
 [rpc_endpoints]
