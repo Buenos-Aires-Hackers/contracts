@@ -4,6 +4,7 @@ out = "out"
 libs = ["lib"]
 remappings = [
     '@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts',
+    'openzeppelin/contracts/=lib/openzeppelin-contracts/contracts',
     '@evvm/testnet-contracts/=src/',
     '@solady/=lib/solady/src/',
     'solidity-bytes-utils/=lib/solidity-bytes-utils/',
@@ -23,5 +24,9 @@ solc = "0.8.30"
 optimizer-runs = 300
 via_ir = true
 fs_permissions = [{ access = "read", path = "./input" }]
+
+# Fork configuration for Base Sepolia
+[rpc_endpoints]
+base_sepolia = "https://sepolia.base.org"
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

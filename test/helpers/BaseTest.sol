@@ -11,7 +11,8 @@ import {Treasury} from "@evvm/testnet-contracts/contracts/treasury/Treasury.sol"
 import {P2PSwap} from "@evvm/testnet-contracts/contracts/p2pSwap/P2PSwap.sol";
 import {EvvmStructs} from "@evvm/testnet-contracts/contracts/evvm/lib/EvvmStructs.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
-import {MockRiscZeroVerifier} from "../mocks/MockRiscZeroVerifier.sol";
+import {IRiscZeroVerifier} from "@risc0/contracts/IRiscZeroVerifier.sol";
+import {NetworkConfig} from "../../script/NetworkConfig.sol";
 
 /**
  * @title BaseTest
@@ -29,7 +30,9 @@ abstract contract BaseTest is Test {
     // Mock contracts
     MockERC20 public usdc;
     MockERC20 public dai;
-    MockRiscZeroVerifier public mockVerifier;
+    
+    // RISC Zero verifier (real contract on Base Sepolia)
+    IRiscZeroVerifier public riscZeroVerifier;
 
     // Test accounts
     address public admin;
@@ -51,8 +54,26 @@ abstract contract BaseTest is Test {
     // Constants
     uint256 public constant INITIAL_BALANCE = 1000 ether;
     uint256 public constant PRINCIPAL_TOKEN_SUPPLY = 1_000_000_000 ether;
+    
+    // RISC Zero configuration constants (these should match your actual ZK proof program)
+    // These are placeholder values - replace with actual values from your ZK proof setup
+    bytes32 public constant RISC0_IMAGE_ID = bytes32(uint256(1)); // TODO: Replace with actual image ID
+    bytes32 public constant RISC0_NOTARY_KEY_FINGERPRINT = bytes32(uint256(2)); // TODO: Replace with actual notary fingerprint
+    bytes32 public constant RISC0_QUERIES_HASH = bytes32(uint256(3)); // TODO: Replace with actual queries hash
 
     function setUp() public virtual {
+        // Fork Base Sepolia for testing
+        vm.createSelectFork(NetworkConfig.BASE_SEPOLIA_RPC_URL);
+        
+        // Verify we're on Base Sepolia
+        require(
+            NetworkConfig.isBaseSepolia(block.chainid),
+            "BaseTest: Must run tests on Base Sepolia fork"
+        );
+        
+        // Get the real RISC Zero verifier router from Base Sepolia
+        riscZeroVerifier = NetworkConfig.getRiscZeroVerifier();
+        
         // Setup test accounts with specific addresses to avoid collisions
         admin = address(0x1234567890123456789012345678901234567890);
         activator = address(0x2345678901234567890123456789012345678901);
@@ -74,9 +95,6 @@ abstract contract BaseTest is Test {
         // Deploy mock tokens
         usdc = new MockERC20("USD Coin", "USDC", 6);
         dai = new MockERC20("Dai Stablecoin", "DAI", 18);
-
-        // Deploy mock verifier
-        mockVerifier = new MockRiscZeroVerifier();
 
         // Deploy core contracts
         _deployCoreContracts();
@@ -117,14 +135,14 @@ abstract contract BaseTest is Test {
         vm.prank(admin);
         nameService = new NameService(address(evvm), admin);
 
-        // Deploy Treasury
+        // Deploy Treasury with real RISC Zero verifier
         vm.prank(admin);
         treasury = new Treasury(
             address(evvm),
-            address(mockVerifier),
-            bytes32(uint256(1)), // Mock image ID
-            bytes32(uint256(2)), // Mock notary fingerprint
-            bytes32(uint256(3)), // Mock queries hash
+            address(riscZeroVerifier),
+            RISC0_IMAGE_ID,
+            RISC0_NOTARY_KEY_FINGERPRINT,
+            RISC0_QUERIES_HASH,
             address(usdc) // Payment token (USDC for tests)
         );
 
@@ -174,6 +192,7 @@ abstract contract BaseTest is Test {
         vm.label(address(p2pSwap), "P2PSwap");
         vm.label(address(usdc), "USDC");
         vm.label(address(dai), "DAI");
+        vm.label(address(riscZeroVerifier), "RiscZeroVerifierRouter");
         vm.label(alice, "Alice");
         vm.label(bob, "Bob");
         vm.label(charlie, "Charlie");

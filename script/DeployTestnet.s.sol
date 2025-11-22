@@ -9,6 +9,7 @@ import {NameService} from "@evvm/testnet-contracts/contracts/nameService/NameSer
 import {EvvmStructs} from "@evvm/testnet-contracts/contracts/evvm/lib/EvvmStructs.sol";
 import {Treasury} from "@evvm/testnet-contracts/contracts/treasury/Treasury.sol";
 import {P2PSwap} from "@evvm/testnet-contracts/contracts/p2pSwap/P2PSwap.sol";
+import {NetworkConfig} from "./NetworkConfig.sol";
 
 contract DeployTestnet is Script {
     Staking staking;
@@ -39,6 +40,12 @@ contract DeployTestnet is Script {
     function setUp() public {}
 
     function run() public {
+        // Verify we're on Base Sepolia
+        require(
+            NetworkConfig.isBaseSepolia(block.chainid),
+            "DeployTestnet: Must deploy to Base Sepolia (chain ID 84532)"
+        );
+
         string memory path = "input/address.json";
         assert(vm.isFile(path));
         string memory data = vm.readFile(path);
@@ -60,6 +67,15 @@ contract DeployTestnet is Script {
 
         AdvancedMetadata memory advancedMetadata = abi.decode(dataJson, (AdvancedMetadata));
 
+        // Get RISC Zero verifier configuration from environment variables
+        // These should be set when running the deployment script
+        address risc0Verifier = NetworkConfig.RISC_ZERO_VERIFIER_ROUTER;
+        bytes32 imageId = vm.envBytes32("RISC0_IMAGE_ID");
+        bytes32 notaryKeyFingerprint = vm.envBytes32("RISC0_NOTARY_KEY_FINGERPRINT");
+        bytes32 queriesHash = vm.envBytes32("RISC0_QUERIES_HASH");
+        address paymentToken = vm.envAddress("PAYMENT_TOKEN_ADDRESS");
+
+        console2.log("Deploying to Base Sepolia (chain ID:", block.chainid, ")");
         console2.log("Admin:", addressData.admin);
         console2.log("GoldenFisher:", addressData.goldenFisher);
         console2.log("Activator:", addressData.activator);
@@ -69,6 +85,9 @@ contract DeployTestnet is Script {
         console2.log("TotalSupply:", advancedMetadata.totalSupply);
         console2.log("EraTokens:", advancedMetadata.eraTokens);
         console2.log("Reward:", advancedMetadata.reward);
+        console2.log("RISC Zero Verifier Router:", risc0Verifier);
+        console2.log("RISC Zero Image ID:", vm.toString(imageId));
+        console2.log("Payment Token:", paymentToken);
 
         EvvmStructs.EvvmMetadata memory inputMetadata = EvvmStructs.EvvmMetadata({
             EvvmName: basicMetadata.EvvmName,
@@ -91,11 +110,11 @@ contract DeployTestnet is Script {
 
         treasury = new Treasury(
             address(evvm),
-            address(0), // TODO: Set risc0 verifier address
-            bytes32(0), // TODO: Set risc0 image ID
-            bytes32(0), // TODO: Set expected notary key fingerprint
-            bytes32(0), // TODO: Set expected queries hash
-            address(0) // TODO: Set payment token address
+            risc0Verifier,
+            imageId,
+            notaryKeyFingerprint,
+            queriesHash,
+            paymentToken
         );
 
         staking._setupEstimatorAndEvvm(address(estimator), address(evvm));
