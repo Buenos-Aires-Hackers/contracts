@@ -1,0 +1,16 @@
+{
+  "response.body": [
+    {
+      "jmespath": "orderStatus",
+      "_description": "Extract the order status (should be 'Delivered')"
+    },
+    {
+      "jmespath": "orderId",
+      "_description": "Extract the order ID to verify it matches the listing URL"
+    },
+    {
+      "jmespath": "shippingAddress.zip",
+      "_description": "Extract ZIP code to verify it matches private credentials"
+    }
+  ]
+}

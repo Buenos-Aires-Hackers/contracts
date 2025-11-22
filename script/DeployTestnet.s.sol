@@ -21,6 +21,10 @@ contract DeployTestnet is Script {
     P2PSwap p2pSwap;
     MockUSDC usdc;
 
+    // Paths for deployment tracking
+    string public PATH_PREFIX;
+    string public DEPLOYMENTS_FILE;
+
     struct AddressData {
         address activator;
         address admin;
@@ -37,6 +41,17 @@ contract DeployTestnet is Script {
         uint256 eraTokens;
         uint256 reward;
         uint256 totalSupply;
+    }
+
+    constructor() {
+        // Setup paths based on chain ID
+        PATH_PREFIX = string.concat("deployments/", vm.toString(block.chainid));
+        DEPLOYMENTS_FILE = string.concat(PATH_PREFIX, "/deployments.json");
+
+        // Create directory if it doesn't exist
+        if (!vm.isDir(PATH_PREFIX)) {
+            vm.createDir(PATH_PREFIX, true);
+        }
     }
 
     function setUp() public {}
@@ -149,5 +164,26 @@ contract DeployTestnet is Script {
         console2.log("Treasury deployed at:", address(treasury));
         console2.log("P2PSwap deployed at:", address(p2pSwap));
         console2.log("Payment Token (USDC):", paymentToken);
+
+        // Save deployment addresses using vm.serialize*
+        _saveDeploymentAddresses(paymentToken);
+    }
+
+    /// @notice Save deployment addresses to JSON file
+    function _saveDeploymentAddresses(address paymentToken) internal {
+        string memory objectKey = "deployments";
+        string memory json = vm.serializeAddress(objectKey, "staking", address(staking));
+        json = vm.serializeAddress(objectKey, "evvm", address(evvm));
+        json = vm.serializeAddress(objectKey, "estimator", address(estimator));
+        json = vm.serializeAddress(objectKey, "nameService", address(nameService));
+        json = vm.serializeAddress(objectKey, "treasury", address(treasury));
+        json = vm.serializeAddress(objectKey, "p2pSwap", address(p2pSwap));
+        json = vm.serializeAddress(objectKey, "paymentToken", paymentToken);
+        json = vm.serializeUint(objectKey, "chainId", block.chainid);
+        json = vm.serializeUint(objectKey, "deployedAt", block.timestamp);
+
+        vm.writeJson(json, DEPLOYMENTS_FILE);
+
+        console2.log("\nDeployment addresses saved to:", DEPLOYMENTS_FILE);
     }
 }

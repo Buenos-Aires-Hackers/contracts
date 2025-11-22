@@ -1,0 +1,46 @@
+{
+  "_comment": "This is an example TLSN web proof structure. Replace with actual proof from TLSN web prover.",
+  "proof": "0x1234567890abcdef...",
+  "version": "1.0",
+  "notary": {
+    "publicKey": "0xabcdef1234567890...",
+    "signature": "0x9876543210fedcba..."
+  },
+  "request": {
+    "method": "GET",
+    "url": "https://www.amazon.com/gp/your-account/order-details/?orderID=111-1234567-8901234",
+    "headers": {
+      "User-Agent": "Mozilla/5.0...",
+      "Accept": "text/html,application/xhtml+xml...",
+      "Cookie": "session-id=..."
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "text/html; charset=UTF-8",
+      "Date": "Mon, 15 Jan 2024 10:30:00 GMT"
+    },
+    "body": {
+      "orderStatus": "Delivered",
+      "orderId": "111-1234567-8901234",
+      "orderDate": "2024-01-10",
+      "orderTotal": "$100.00",
+      "shippingAddress": {
+        "name": "John Doe",
+        "street": "123 Main St",
+        "city": "New York",
+        "state": "NY",
+        "zip": "10001",
+        "country": "USA"
+      },
+      "items": [
+        {
+          "title": "Example Product",
+          "price": "$100.00",
+          "quantity": 1
+        }
+      ]
+    }
+  }
+}

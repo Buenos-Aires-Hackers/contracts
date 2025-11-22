@@ -23,9 +23,13 @@ remappings = [
 solc = "0.8.30"
 optimizer-runs = 300
 via_ir = true
+ffi = true
 fs_permissions = [
     { access = "read", path = "./input" },
-    { access = "read", path = "./target" }
+    { access = "read", path = "./target" },
+    { access = "read", path = "./script" },
+    { access = "read-write", path = "./script/helpers" },
+    { access = "read-write", path = "./deployments" }
 ]
 
 # Fork configuration for Base Sepolia
