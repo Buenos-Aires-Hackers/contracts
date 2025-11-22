@@ -45,8 +45,7 @@ contract Treasury {
     error ZKProofVerificationFailed();
     error InvalidContributions();
 
-    mapping(address who => mapping(address token => Allowance info))
-        public allowedAmountOf;
+    mapping(address who => mapping(address token => Allowance info)) public allowedAmountOf;
 
     /// @notice Address of the EVVM core contract
     address public evvmAddress;
@@ -101,11 +100,7 @@ contract Treasury {
             }
             if (amount != msg.value) revert ErrorsLib.InvalidDepositAmount();
 
-            Evvm(evvmAddress).addAmountToUser(
-                msg.sender,
-                address(0),
-                msg.value
-            );
+            Evvm(evvmAddress).addAmountToUser(msg.sender, address(0), msg.value);
         } else {
             /// user is sending ERC20 tokens
 
@@ -125,9 +120,7 @@ contract Treasury {
      * @param amount Amount to withdraw
      */
     function withdraw(address token, uint256 amount) external {
-        if (
-            token == Evvm(evvmAddress).getEvvmMetadata().principalTokenAddress
-        ) {
+        if (token == Evvm(evvmAddress).getEvvmMetadata().principalTokenAddress) {
             revert ErrorsLib.PrincipalTokenIsNotWithdrawable();
         }
 
@@ -138,11 +131,7 @@ contract Treasury {
         if (token == address(0)) {
             /// user is trying to withdraw native coin
 
-            Evvm(evvmAddress).removeAmountFromUser(
-                msg.sender,
-                address(0),
-                amount
-            );
+            Evvm(evvmAddress).removeAmountFromUser(msg.sender, address(0), amount);
             SafeTransferLib.safeTransferETH(msg.sender, amount);
         } else {
             /// user is trying to withdraw ERC20 tokens
@@ -159,20 +148,29 @@ contract Treasury {
         bytes calldata purchaseData,
         bytes calldata seal
     ) external {
-        (
-            bytes32 notaryKeyFingerprint,
-            string memory _method,
-            string memory url,
-            uint256 timestamp,
-            bytes32 queriesHash
-        ) = abi.decode(
-                purchaseData,
-                (bytes32, string, string, uint256, bytes32)
-            );
+        (bytes32 notaryKeyFingerprint, string memory method, string memory url, uint256 timestamp, bytes32 queriesHash)
+        = abi.decode(purchaseData, (bytes32, string, string, uint256, bytes32));
 
         // Validate notary key fingerprint
         if (notaryKeyFingerprint != EXPECTED_NOTARY_KEY_FINGERPRINT) {
             revert InvalidNotaryKeyFingerprint();
+        }
+
+        // Validate URL matches the expected endpoint pattern provided at deployment
+        // The URL may include an API key parameter, so we check if it starts with the expected pattern
+        bytes memory urlBytes = bytes(url);
+        bytes memory patternBytes = bytes(expectedUrlPattern);
+
+        // Validate method is GET (expected for API calls)
+        if (keccak256(bytes(method)) != keccak256(bytes("GET")) || urlBytes.length < patternBytes.length) {
+            revert InvalidUrl();
+        }
+
+        // Compare the first part of the URL with the expected pattern
+        for (uint256 i = 0; i < patternBytes.length; i++) {
+            if (urlBytes[i] != patternBytes[i]) {
+                revert InvalidUrl();
+            }
         }
 
         // Validate queries hash
@@ -187,9 +185,22 @@ contract Treasury {
 
         // Verify the ZK proof
         try VERIFIER.verify(seal, IMAGE_ID, sha256(purchaseData)) {
-            // Proof verified successfully
+            Evvm(evvmAddress).removeAmountFromUser(shopper, token, amount);
+            Evvm(evvmAddress).addAmountToUser(msg.sender, token, amount);
         } catch {
             revert ZKProofVerificationFailed();
         }
     }
+
+    function transferWithAuthorization(
+        address from,
+        address to,
+        uint256 value,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external {}
 }
