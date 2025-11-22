@@ -9,6 +9,7 @@ import {NameService} from "@evvm/testnet-contracts/contracts/nameService/NameSer
 import {EvvmStructs} from "@evvm/testnet-contracts/contracts/evvm/lib/EvvmStructs.sol";
 import {Treasury} from "@evvm/testnet-contracts/contracts/treasury/Treasury.sol";
 import {P2PSwap} from "@evvm/testnet-contracts/contracts/p2pSwap/P2PSwap.sol";
+import {MockUSDC} from "../src/contracts/mocks/MockUSDC.sol";
 import {NetworkConfig} from "./NetworkConfig.sol";
 
 contract DeployTestnet is Script {
@@ -18,6 +19,7 @@ contract DeployTestnet is Script {
     NameService nameService;
     Treasury treasury;
     P2PSwap p2pSwap;
+    MockUSDC usdc;
 
     struct AddressData {
         address activator;
@@ -68,12 +70,17 @@ contract DeployTestnet is Script {
         AdvancedMetadata memory advancedMetadata = abi.decode(dataJson, (AdvancedMetadata));
 
         // Get RISC Zero verifier configuration from environment variables
-        // These should be set when running the deployment script
         address risc0Verifier = NetworkConfig.RISC_ZERO_VERIFIER_ROUTER;
-        bytes32 imageId = vm.envBytes32("RISC0_IMAGE_ID");
-        bytes32 notaryKeyFingerprint = vm.envBytes32("RISC0_NOTARY_KEY_FINGERPRINT");
-        bytes32 queriesHash = vm.envBytes32("RISC0_QUERIES_HASH");
-        address paymentToken = vm.envAddress("PAYMENT_TOKEN_ADDRESS");
+        bytes32 imageId = vm.envOr("RISC0_IMAGE_ID", bytes32(0));
+        bytes32 notaryKeyFingerprint = vm.envOr("NOTARY_KEY_FINGERPRINT", bytes32(0));
+        bytes32 queriesHash = vm.envOr("QUERIES_HASH", bytes32(0));
+        // Use provided payment token address, or deploy MockUSDC if not provided
+        address paymentToken = vm.envOr("PAYMENT_TOKEN_ADDRESS", address(0));
+
+        // Validate parameters (following pattern from zk-github-contribution-verifier)
+        require(imageId != bytes32(0), "RISC0_IMAGE_ID not set");
+        require(notaryKeyFingerprint != bytes32(0), "RISC0_NOTARY_KEY_FINGERPRINT not set");
+        require(queriesHash != bytes32(0), "RISC0_QUERIES_HASH not set");
 
         console2.log("Deploying to Base Sepolia (chain ID:", block.chainid, ")");
         console2.log("Admin:", addressData.admin);
@@ -86,7 +93,12 @@ contract DeployTestnet is Script {
         console2.log("EraTokens:", advancedMetadata.eraTokens);
         console2.log("Reward:", advancedMetadata.reward);
         console2.log("RISC Zero Verifier Router:", risc0Verifier);
-        console2.log("RISC Zero Image ID:", vm.toString(imageId));
+        console2.log("Image ID:");
+        console2.logBytes32(imageId);
+        console2.log("Notary Key Fingerprint:");
+        console2.logBytes32(notaryKeyFingerprint);
+        console2.log("Queries Hash:");
+        console2.logBytes32(queriesHash);
         console2.log("Payment Token:", paymentToken);
 
         EvvmStructs.EvvmMetadata memory inputMetadata = EvvmStructs.EvvmMetadata({
@@ -102,6 +114,13 @@ contract DeployTestnet is Script {
         });
 
         vm.startBroadcast();
+
+        // Deploy MockUSDC if payment token not provided
+        if (paymentToken == address(0)) {
+            usdc = new MockUSDC();
+            paymentToken = address(usdc);
+            console2.log("MockUSDC deployed at:", address(usdc));
+        }
 
         staking = new Staking(addressData.admin, addressData.goldenFisher);
         evvm = new Evvm(addressData.admin, address(staking), inputMetadata);
@@ -129,5 +148,6 @@ contract DeployTestnet is Script {
         console2.log("NameService deployed at:", address(nameService));
         console2.log("Treasury deployed at:", address(treasury));
         console2.log("P2PSwap deployed at:", address(p2pSwap));
+        console2.log("Payment Token (USDC):", paymentToken);
     }
 }

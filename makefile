@@ -23,6 +23,14 @@ ETH_SEPOLIA_TESTNET_ARGS := --rpc-url $(RPC_URL_ETH_SEPOLIA) \
                             --verify \
                             --etherscan-api-key $(ETHERSCAN_API) \
 
+BASE_SEPOLIA_TESTNET_ARGS := --rpc-url https://sepolia.base.org \
+                             --chain-id 84532 \
+                             --private-key $(PRIVATE_KEY) \
+                             --broadcast \
+                             --verify \
+                             --etherscan-api-key $(ETHERSCAN_API) \
+                             --via-ir
+
 # Main commands
 all: clean remove install update build 
 
@@ -52,8 +60,10 @@ deployTestnet:
 		forge script script/DeployTestnet.s.sol:DeployTestnet $(ETH_SEPOLIA_TESTNET_ARGS) -vvvvvv; \
 	elif [ "$(NETWORK)" = "arb" ] || [ -z "$(NETWORK)" ]; then \
 		forge script script/DeployTestnet.s.sol:DeployTestnet $(ARB_SEPOLIA_TESTNET_ARGS) -vvvvvv; \
+	elif [ "$(NETWORK)" = "base" ]; then \
+		forge script script/DeployTestnet.s.sol:DeployTestnet $(BASE_SEPOLIA_TESTNET_ARGS) -vvvvvv; \
 	else \
-		echo "Unknown network: $(NETWORK). Use 'eth' or 'arb'"; exit 1; \
+		echo "Unknown network: $(NETWORK). Use 'eth', 'arb', or 'base'"; exit 1; \
 	fi
 
 deployTestnetCrossChainHost: 
@@ -87,9 +97,9 @@ help:
 	@echo ""
 	@echo "========================== Deployment Commands ============================="
 	@echo ""
-	@echo "  make deployTestnet NETWORK=<eth|arb> -- Deploy testnet contracts"
+	@echo "  make deployTestnet NETWORK=<eth|arb|base> -- Deploy testnet contracts"
 	@echo "                                          Default: arb (Arbitrum Sepolia)"
-	@echo "                                          Options: eth (Ethereum Sepolia)"
+	@echo "                                          Options: eth (Ethereum Sepolia), base (Base Sepolia)"
 	@echo ""
 	@echo "  make deployTestnetAnvil -------------- Deploy contracts on local Anvil testnet"
 	@echo ""
@@ -106,6 +116,7 @@ help:
 	@echo ""
 	@echo "  make deployTestnet NETWORK=eth ------- Deploy to Ethereum Sepolia"
 	@echo "  make deployTestnet NETWORK=arb ------- Deploy to Arbitrum Sepolia"
+	@echo "  make deployTestnet NETWORK=base ------ Deploy to Base Sepolia"
 	@echo "  make deployTestnet ----------------- Deploy to Arbitrum Sepolia (default)"
 	@echo ""
 	@echo "================================== Notes ====================================="

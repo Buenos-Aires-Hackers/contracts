@@ -10,6 +10,7 @@ import {NameService} from "@evvm/testnet-contracts/contracts/nameService/NameSer
 import {Treasury} from "@evvm/testnet-contracts/contracts/treasury/Treasury.sol";
 import {P2PSwap} from "@evvm/testnet-contracts/contracts/p2pSwap/P2PSwap.sol";
 import {EvvmStructs} from "@evvm/testnet-contracts/contracts/evvm/lib/EvvmStructs.sol";
+import {MockUSDC} from "../../src/contracts/mocks/MockUSDC.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
 import {IRiscZeroVerifier} from "@risc0/contracts/IRiscZeroVerifier.sol";
 import {NetworkConfig} from "../../script/NetworkConfig.sol";
@@ -28,7 +29,7 @@ abstract contract BaseTest is Test {
     P2PSwap public p2pSwap;
 
     // Mock contracts
-    MockERC20 public usdc;
+    MockUSDC public usdc;
     MockERC20 public dai;
     
     // RISC Zero verifier (real contract on Base Sepolia)
@@ -93,7 +94,7 @@ abstract contract BaseTest is Test {
         backend = vm.addr(backendPrivateKey);
 
         // Deploy mock tokens
-        usdc = new MockERC20("USD Coin", "USDC", 6);
+        usdc = new MockUSDC();
         dai = new MockERC20("Dai Stablecoin", "DAI", 18);
 
         // Deploy core contracts
