@@ -44,8 +44,10 @@ contract Treasury {
     error InvalidUrl();
     error ZKProofVerificationFailed();
     error InvalidContributions();
+    error Expired();
 
-    mapping(address who => mapping(address token => Allowance info)) public allowedAmountOf;
+    mapping(address who => mapping(address token => Allowance info))
+        public allowedAmountOf;
 
     /// @notice Address of the EVVM core contract
     address public evvmAddress;
@@ -63,6 +65,8 @@ contract Treasury {
     /// @notice Expected queries hash - validates correct fields are extracted
     /// @dev Computed from the JMESPath queries used to extract balance
     bytes32 public immutable EXPECTED_QUERIES_HASH;
+
+    address public immutable PAYMENT_TOKEN;
 
     /// @notice Expected URL pattern for Etherscan API
     string public expectedUrlPattern;
@@ -100,7 +104,11 @@ contract Treasury {
             }
             if (amount != msg.value) revert ErrorsLib.InvalidDepositAmount();
 
-            Evvm(evvmAddress).addAmountToUser(msg.sender, address(0), msg.value);
+            Evvm(evvmAddress).addAmountToUser(
+                msg.sender,
+                address(0),
+                msg.value
+            );
         } else {
             /// user is sending ERC20 tokens
 
@@ -119,37 +127,50 @@ contract Treasury {
      * @param token Token address (address(0) for ETH)
      * @param amount Amount to withdraw
      */
-    function withdraw(address token, uint256 amount) external {
-        if (token == Evvm(evvmAddress).getEvvmMetadata().principalTokenAddress) {
+    function withdraw(address token, uint256 amount) internal {
+        _withdraw(msg.sender, token, amount);
+    }
+
+    function _withdraw(address to, address token, uint256 amount) internal {
+        if (
+            token == Evvm(evvmAddress).getEvvmMetadata().principalTokenAddress
+        ) {
             revert ErrorsLib.PrincipalTokenIsNotWithdrawable();
         }
 
-        if (Evvm(evvmAddress).getBalance(msg.sender, token) < amount) {
+        if (Evvm(evvmAddress).getBalance(to, token) < amount) {
             revert ErrorsLib.InsufficientBalance();
         }
 
         if (token == address(0)) {
             /// user is trying to withdraw native coin
 
-            Evvm(evvmAddress).removeAmountFromUser(msg.sender, address(0), amount);
-            SafeTransferLib.safeTransferETH(msg.sender, amount);
+            Evvm(evvmAddress).removeAmountFromUser(to, address(0), amount);
+            SafeTransferLib.safeTransferETH(to, amount);
         } else {
             /// user is trying to withdraw ERC20 tokens
 
-            Evvm(evvmAddress).removeAmountFromUser(msg.sender, token, amount);
-            IERC20(token).transfer(msg.sender, amount);
+            Evvm(evvmAddress).removeAmountFromUser(to, token, amount);
+            IERC20(token).transfer(to, amount);
         }
     }
 
     function submitPurchase(
         address shopper,
-        address token,
         uint256 amount,
         bytes calldata purchaseData,
         bytes calldata seal
     ) external {
-        (bytes32 notaryKeyFingerprint, string memory method, string memory url, uint256 timestamp, bytes32 queriesHash)
-        = abi.decode(purchaseData, (bytes32, string, string, uint256, bytes32));
+        (
+            bytes32 notaryKeyFingerprint,
+            string memory method,
+            string memory url,
+            uint256 timestamp,
+            bytes32 queriesHash
+        ) = abi.decode(
+                purchaseData,
+                (bytes32, string, string, uint256, bytes32)
+            );
 
         // Validate notary key fingerprint
         if (notaryKeyFingerprint != EXPECTED_NOTARY_KEY_FINGERPRINT) {
@@ -162,7 +183,10 @@ contract Treasury {
         bytes memory patternBytes = bytes(expectedUrlPattern);
 
         // Validate method is GET (expected for API calls)
-        if (keccak256(bytes(method)) != keccak256(bytes("GET")) || urlBytes.length < patternBytes.length) {
+        if (
+            keccak256(bytes(method)) != keccak256(bytes("GET")) ||
+            urlBytes.length < patternBytes.length
+        ) {
             revert InvalidUrl();
         }
 
@@ -185,8 +209,16 @@ contract Treasury {
 
         // Verify the ZK proof
         try VERIFIER.verify(seal, IMAGE_ID, sha256(purchaseData)) {
-            Evvm(evvmAddress).removeAmountFromUser(shopper, token, amount);
-            Evvm(evvmAddress).addAmountToUser(msg.sender, token, amount);
+            Evvm(evvmAddress).removeAmountFromUser(
+                shopper,
+                PAYMENT_TOKEN,
+                amount
+            );
+            Evvm(evvmAddress).addAmountToUser(
+                msg.sender,
+                PAYMENT_TOKEN,
+                amount
+            );
         } catch {
             revert ZKProofVerificationFailed();
         }
@@ -202,5 +234,9 @@ contract Treasury {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external {}
+    ) external {
+        uint256 timestamp = block.timestamp;
+        if (timestamp < validAfter || timestamp > validBefore) revert Expired();
+        _withdraw(to, PAYMENT_TOKEN, value);
+    }
 }
