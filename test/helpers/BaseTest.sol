@@ -121,7 +121,6 @@ abstract contract BaseTest is Test {
             bytes32(uint256(1)), // Mock image ID
             bytes32(uint256(2)), // Mock notary fingerprint
             bytes32(uint256(3)), // Mock queries hash
-            "https://api.etherscan.io/api", // Mock URL pattern
             address(usdc) // Payment token (USDC for tests)
         );
 

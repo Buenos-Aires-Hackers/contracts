@@ -33,10 +33,13 @@ import {ErrorsLib} from "@evvm/testnet-contracts/contracts/treasury/lib/ErrorsLi
 import {IRiscZeroVerifier} from "@risc0/contracts/IRiscZeroVerifier.sol";
 
 contract Treasury {
-    struct Allowance {
+    struct Listing {
+        string url;
         uint256 amount;
-        uint256 validUntil;
+        address shopper;
     }
+
+    mapping(bytes32 id => Listing listing) public fetchListing;
 
     /// @notice Custom errors
     error InvalidNotaryKeyFingerprint();
@@ -45,9 +48,9 @@ contract Treasury {
     error ZKProofVerificationFailed();
     error InvalidContributions();
     error Expired();
+    error InvalidListing();
 
-    mapping(address who => mapping(address token => Allowance info))
-        public allowedAmountOf;
+    event ListingCreated(Listing listing, bytes32 id);
 
     /// @notice Address of the EVVM core contract
     address public evvmAddress;
@@ -68,9 +71,6 @@ contract Treasury {
 
     address public immutable PAYMENT_TOKEN;
 
-    /// @notice Expected URL pattern for Etherscan API
-    string public expectedUrlPattern;
-
     /**
      * @notice Initialize Treasury with EVVM contract address
      * @param _evvmAddress Address of the EVVM core contract
@@ -81,7 +81,6 @@ contract Treasury {
         bytes32 _imageId,
         bytes32 _expectedNotaryKeyFingerprint,
         bytes32 _expectedQueriesHash,
-        string memory _expectedUrlPattern,
         address _paymentToken
     ) {
         evvmAddress = _evvmAddress;
@@ -89,7 +88,6 @@ contract Treasury {
         IMAGE_ID = _imageId;
         EXPECTED_NOTARY_KEY_FINGERPRINT = _expectedNotaryKeyFingerprint;
         EXPECTED_QUERIES_HASH = _expectedQueriesHash;
-        expectedUrlPattern = _expectedUrlPattern;
         PAYMENT_TOKEN = _paymentToken;
     }
 
@@ -99,6 +97,14 @@ contract Treasury {
      * @param amount Token amount (ignored for ETH deposits)
      */
     function deposit(address token, uint256 amount) external payable {
+        depositFrom(msg.sender, token, amount);
+    }
+
+    function depositFrom(
+        address depositor,
+        address token,
+        uint256 amount
+    ) public payable {
         if (address(0) == token) {
             /// user is sending host native coin
             if (msg.value == 0) {
@@ -106,11 +112,7 @@ contract Treasury {
             }
             if (amount != msg.value) revert ErrorsLib.InvalidDepositAmount();
 
-            Evvm(evvmAddress).addAmountToUser(
-                msg.sender,
-                address(0),
-                msg.value
-            );
+            Evvm(evvmAddress).addAmountToUser(depositor, address(0), msg.value);
         } else {
             /// user is sending ERC20 tokens
 
@@ -119,8 +121,8 @@ contract Treasury {
                 revert ErrorsLib.DepositAmountMustBeGreaterThanZero();
             }
 
-            IERC20(token).transferFrom(msg.sender, address(this), amount);
-            Evvm(evvmAddress).addAmountToUser(msg.sender, token, amount);
+            IERC20(token).transferFrom(depositor, address(this), amount);
+            Evvm(evvmAddress).addAmountToUser(depositor, token, amount);
         }
     }
 
@@ -157,9 +159,19 @@ contract Treasury {
         }
     }
 
+    function list(Listing calldata listing) external {
+        depositFrom(listing.shopper, PAYMENT_TOKEN, listing.amount);
+        fetchListing[keccak256(abi.encode(listing))] = listing;
+    }
+
+    function calculateId(
+        Listing calldata listing
+    ) external pure returns (bytes32 id) {
+        id = keccak256(abi.encode(listing));
+    }
+
     function submitPurchase(
-        address shopper,
-        uint256 amount,
+        bytes32 id,
         bytes calldata purchaseData,
         bytes calldata seal
     ) external {
@@ -174,6 +186,9 @@ contract Treasury {
                 (bytes32, string, string, uint256, bytes32)
             );
 
+        Listing memory listing = fetchListing[id];
+        if (listing.shopper == address(0)) revert InvalidListing();
+
         // Validate notary key fingerprint
         if (notaryKeyFingerprint != EXPECTED_NOTARY_KEY_FINGERPRINT) {
             revert InvalidNotaryKeyFingerprint();
@@ -182,7 +197,7 @@ contract Treasury {
         // Validate URL matches the expected endpoint pattern provided at deployment
         // The URL may include an API key parameter, so we check if it starts with the expected pattern
         bytes memory urlBytes = bytes(url);
-        bytes memory patternBytes = bytes(expectedUrlPattern);
+        bytes memory patternBytes = bytes(listing.url);
 
         // Validate method is GET (expected for API calls)
         if (
@@ -205,22 +220,23 @@ contract Treasury {
         }
 
         // Validate URL equals the expected endpoint pattern provided at deployment
-        if (keccak256(bytes(url)) != keccak256(bytes(expectedUrlPattern))) {
+        if (keccak256(bytes(url)) != keccak256(bytes(listing.url))) {
             revert InvalidUrl();
         }
 
         // Verify the ZK proof
         try VERIFIER.verify(seal, IMAGE_ID, sha256(purchaseData)) {
             Evvm(evvmAddress).removeAmountFromUser(
-                shopper,
+                listing.shopper,
                 PAYMENT_TOKEN,
-                amount
+                listing.amount
             );
             Evvm(evvmAddress).addAmountToUser(
                 msg.sender,
                 PAYMENT_TOKEN,
-                amount
+                listing.amount
             );
+            delete fetchListing[id];
         } catch {
             revert ZKProofVerificationFailed();
         }
@@ -242,7 +258,8 @@ contract Treasury {
 
         // Transfer from 'from' to 'to' by withdrawing from 'from' and crediting 'to'
         if (
-            PAYMENT_TOKEN == Evvm(evvmAddress).getEvvmMetadata().principalTokenAddress
+            PAYMENT_TOKEN ==
+            Evvm(evvmAddress).getEvvmMetadata().principalTokenAddress
         ) {
             revert ErrorsLib.PrincipalTokenIsNotWithdrawable();
         }

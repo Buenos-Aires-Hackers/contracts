@@ -94,7 +94,6 @@ contract DeployTestnetOnAnvil is Script {
             bytes32(0), // TODO: Set risc0 image ID
             bytes32(0), // TODO: Set expected notary key fingerprint
             bytes32(0), // TODO: Set expected queries hash
-            "", // TODO: Set expected URL pattern
             address(0) // TODO: Set payment token address
         );
 
