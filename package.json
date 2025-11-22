@@ -1,0 +1,70 @@
+{
+  "name": "@evvm/testnet-contracts",
+  "version": "2.1.2",
+  "type": "module",
+  "description": "EVVM Testnet Contracts - Smart contracts and tools for scalable, modular, and cross-chain EVM virtualization",
+  "files": [
+    "contracts/**/*.sol",
+    "interfaces/**/*.sol",
+    "library/**/*.sol",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "evvm",
+    "ethereum",
+    "virtual-machine",
+    "solidity",
+    "smart-contracts",
+    "cross-chain",
+    "testnet",
+    "evm",
+    "blockchain",
+    "defi"
+  ],
+  "author": "EVVM Organization",
+  "license": "EVVM-NONCOMMERCIAL-1.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EVVM-org/Testnet-Contracts.git"
+  },
+  "homepage": "https://github.com/EVVM-org/Testnet-Contracts#readme",
+  "bugs": {
+    "url": "https://github.com/EVVM-org/Testnet-Contracts/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "npm run copy-files",
+    "copy-files": "cp -r src/contracts . && cp -r src/interfaces . && cp -r src/library .",
+    "clean": "rm -rf contracts interfaces library",
+    "prepare-publish": "npm run copy-files && npm pack",
+    "publish-package": "npm run copy-files && npm publish && npm run clean",
+    "compile": "forge build",
+    "test": "forge test",
+    "deploy:anvil": "make deployLocalTestnet",
+    "deploy:sepolia": "make deployTestnet NETWORK=eth",
+    "deploy:arbitrum": "make deployTestnet NETWORK=arb",
+    "wizard": "tsx scripts/evvm-init.ts",
+    "wizard:deploy": "tsx scripts/evvm-init.ts --deploy"
+  },
+  "peerDependencies": {
+    "@openzeppelin/contracts": "^5.0.0"
+  },
+  "dependencies": {
+    "@hyperlane-xyz/core": "^3.6.1",
+    "chalk": "^5.3.0",
+    "dotenv": "^16.4.5",
+    "execa": "^8.0.1",
+    "prompts": "^2.4.2",
+    "viem": "^2.39.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/prompts": "^2.4.9",
+    "forge-std": "^1.0.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0"
+  }
+}
