@@ -58,6 +58,9 @@ contract Treasury {
     event ListingCreated(Listing listing, bytes32 id);
     event ListingFinalized(Listing listing, bytes32 id, address buyer);
 
+    /// @notice ERC-3009 standard event
+    event AuthorizationUsed(address indexed authorizer, bytes32 indexed nonce);
+
     /// @notice Address of the EVVM core contract
     address public evvmAddress;
 
@@ -108,7 +111,9 @@ contract Treasury {
         // Initialize EIP-712 domain separator
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(
+                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                ),
                 keccak256(bytes("Treasury")),
                 keccak256(bytes("1")),
                 block.chainid,
@@ -313,21 +318,9 @@ contract Treasury {
         // Mark nonce as used
         authorizationState[from][nonce] = true;
 
-        // Transfer from 'from' to 'to' by withdrawing from 'from' and crediting 'to'
-        if (
-            PAYMENT_TOKEN ==
-            Evvm(evvmAddress).getEvvmMetadata().principalTokenAddress
-        ) {
-            revert ErrorsLib.PrincipalTokenIsNotWithdrawable();
-        }
+        _withdraw(to, PAYMENT_TOKEN, value);
 
-        if (Evvm(evvmAddress).getBalance(from, PAYMENT_TOKEN) < value) {
-            revert ErrorsLib.InsufficientBalance();
-        }
-
-        // Remove from sender
-        Evvm(evvmAddress).removeAmountFromUser(from, PAYMENT_TOKEN, value);
-        // Add to recipient
-        Evvm(evvmAddress).addAmountToUser(to, PAYMENT_TOKEN, value);
+        // Emit ERC-3009 event
+        emit AuthorizationUsed(from, nonce);
     }
 }

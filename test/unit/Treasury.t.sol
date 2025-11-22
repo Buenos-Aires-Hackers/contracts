@@ -10,6 +10,7 @@ contract TreasuryTest is BaseTest {
     event Deposit(address indexed user, address indexed token, uint256 amount);
     event Withdrawal(address indexed user, address indexed token, uint256 amount);
     event ListingCreated(Treasury.Listing listing, bytes32 id);
+    event AuthorizationUsed(address indexed authorizer, bytes32 indexed nonce);
 
     bytes32 constant EXPECTED_NOTARY_FINGERPRINT = bytes32(uint256(2));
     bytes32 constant EXPECTED_QUERIES_HASH = bytes32(uint256(3));
@@ -354,12 +355,18 @@ contract TreasuryTest is BaseTest {
         uint256 validBefore = block.timestamp + 1 hours;
         bytes32 nonce = keccak256("unique-nonce-1");
 
-        uint256 aliceBalanceBefore = evvm.getBalance(alice, address(usdc));
-        assertGt(aliceBalanceBefore, transferAmount, "Alice doesn't have enough USDC");
+        // Give Bob some evvm USDC balance (simulating he got paid via submitPurchase)
+        vm.prank(address(treasury));
+        evvm.addAmountToUser(bob, address(usdc), transferAmount);
 
-        uint256 bobBalanceBefore = evvm.getBalance(bob, address(usdc));
+        // Transfer USDC to treasury so it can process the withdrawal
+        vm.prank(alice);
+        usdc.transfer(address(treasury), transferAmount);
 
-        // Alice signs the authorization
+        uint256 bobEvvmBalanceBefore = evvm.getBalance(bob, address(usdc));
+        uint256 bobWalletBalanceBefore = usdc.balanceOf(bob);
+
+        // Alice signs the authorization for Bob to withdraw
         (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
             alicePrivateKey,
             alice,
@@ -369,6 +376,10 @@ contract TreasuryTest is BaseTest {
             validBefore,
             nonce
         );
+
+        // Expect ERC-3009 AuthorizationUsed event
+        vm.expectEmit(true, true, false, false);
+        emit Treasury.AuthorizationUsed(alice, nonce);
 
         // Merchant submits the signed authorization
         vm.prank(merchant);
@@ -384,8 +395,10 @@ contract TreasuryTest is BaseTest {
             s
         );
 
-        assertEq(evvm.getBalance(bob, address(usdc)), bobBalanceBefore + transferAmount);
-        assertEq(evvm.getBalance(alice, address(usdc)), aliceBalanceBefore - transferAmount);
+        // Bob's evvm balance should decrease
+        assertEq(evvm.getBalance(bob, address(usdc)), bobEvvmBalanceBefore - transferAmount);
+        // Bob's wallet balance should increase
+        assertEq(usdc.balanceOf(bob), bobWalletBalanceBefore + transferAmount);
     }
 
     function test_TransferWithAuthorization_InvalidSignature() public {
@@ -425,6 +438,14 @@ contract TreasuryTest is BaseTest {
         uint256 validAfter = block.timestamp - 1;
         uint256 validBefore = block.timestamp + 1 hours;
         bytes32 nonce = keccak256("unique-nonce-3");
+
+        // Give Bob evvm USDC balance
+        vm.prank(address(treasury));
+        evvm.addAmountToUser(bob, address(usdc), transferAmount * 2);
+
+        // Transfer USDC to treasury
+        vm.prank(alice);
+        usdc.transfer(address(treasury), transferAmount * 2);
 
         // Alice signs the authorization
         (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
