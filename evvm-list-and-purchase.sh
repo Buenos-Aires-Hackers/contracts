@@ -5,6 +5,10 @@ if [ -f .env ]; then
     export $(cat .env | grep -v '^#' | xargs)
 fi
 
+# Set vlayer API credentials (can be overridden by .env file)
+export VLAYER_CLIENT_ID="${VLAYER_CLIENT_ID:-3006e6ae-1252-4444-9f62-f991f9da02e9}"
+export VLAYER_API_KEY="${VLAYER_API_KEY:-Eb1cLVBBZIcoidDWZSQ9AM53RgUJo7qLyeBcpjqbgDITb3xh4VBBJsBAXiLnnSDa}"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -75,6 +79,59 @@ done
 # Get wallet from environment or use default
 WALLET=${WALLET:-defaultKey}
 
+# Get the broadcaster address from the wallet account
+# This ensures the shopper matches the broadcaster
+BROADCASTER_ADDRESS=""
+
+# Try multiple methods to get the address
+# Method 1: cast wallet address with account name (works for non-encrypted wallets)
+BROADCASTER_ADDRESS=$(cast wallet address $WALLET 2>/dev/null | grep -oE "0x[a-fA-F0-9]{40}" | head -1 || echo "")
+
+# Method 2: Try to find keystore file and get address (may require password)
+if [[ -z "$BROADCASTER_ADDRESS" ]]; then
+    KEYSTORE_DIR="$HOME/.foundry/keystores"
+    if [[ -d "$KEYSTORE_DIR" ]]; then
+        # Look for keystore file matching the wallet name
+        KEYSTORE_FILE=$(find "$KEYSTORE_DIR" -type f -name "*$WALLET*" 2>/dev/null | head -1)
+        if [[ -n "$KEYSTORE_FILE" ]]; then
+            # Try without password first
+            BROADCASTER_ADDRESS=$(cast wallet address --keystore "$KEYSTORE_FILE" 2>/dev/null | grep -oE "0x[a-fA-F0-9]{40}" | head -1 || echo "")
+            
+            # If that failed, try with password
+            if [[ -z "$BROADCASTER_ADDRESS" ]]; then
+                echo -e "${BLUE}Keystore requires password. Please enter password for wallet '$WALLET':${NC}"
+                read -s KEYSTORE_PASSWORD
+                echo ""  # New line after password input
+                
+                # Get private key using password, then derive address from it
+                PRIVATE_KEY=$(cast wallet private-key --keystore "$KEYSTORE_FILE" --password "$KEYSTORE_PASSWORD" 2>/dev/null | grep -oE "0x[a-fA-F0-9]{64}" | head -1 || echo "")
+                if [[ -n "$PRIVATE_KEY" ]]; then
+                    BROADCASTER_ADDRESS=$(cast wallet address --private-key "$PRIVATE_KEY" 2>/dev/null | grep -oE "0x[a-fA-F0-9]{40}" | head -1 || echo "")
+                fi
+                
+                # Clear password from memory (best effort)
+                unset KEYSTORE_PASSWORD
+            fi
+        fi
+    fi
+fi
+
+# Method 3: Last resort - prompt user for address if we still don't have it
+if [[ -z "$BROADCASTER_ADDRESS" ]]; then
+    echo -e "${YELLOW}Could not automatically determine broadcaster address from wallet '$WALLET'.${NC}"
+    echo -e "${BLUE}Please enter your broadcaster address (the address used with --account $WALLET):${NC}"
+    while true; do
+        read -p "Broadcaster address (0x...): " BROADCASTER_ADDRESS
+        if validate_address "$BROADCASTER_ADDRESS"; then
+            break
+        else
+            echo -e "${RED}Error: Invalid address. Must be a valid Ethereum address (0x + 40 hex characters)${NC}"
+        fi
+    done
+fi
+
+echo -e "${GREEN}Broadcaster address: $BROADCASTER_ADDRESS${NC}"
+
 # Set RPC URL and network args based on selection
 if [[ $network == "custom" ]]; then
     echo -e "${BLUE}=== Custom Network Configuration ===${NC}"
@@ -101,8 +158,8 @@ fi
 echo -e "\n${GREEN}=== Listing Configuration ===${NC}"
 
 # Get listing URL
-read -p "$(echo -e "Listing URL ${GRAY}[https://www.amazon.com/gp/your-account/order-details/?orderID=111-1234567-8901234]${NC}: ")" listing_url
-listing_url=${listing_url:-"https://www.amazon.com/gp/your-account/order-details/?orderID=111-1234567-8901234"}
+read -p "$(echo -e "Listing URL ${GRAY}[https://data-api.binance.vision/api/v3/ticker/price?symbol=ETHUSDC]${NC}: ")" listing_url
+listing_url=${listing_url:-"https://data-api.binance.vision/api/v3/ticker/price?symbol=ETHUSDC"}
 
 # Get listing amount
 while true; do
@@ -195,8 +252,20 @@ fi
 # Set environment variables for List.s.sol
 export LISTING_URL="$listing_url"
 export LISTING_AMOUNT="$listing_amount"
+
+# Set shopper address - use provided address, or default to broadcaster address
 if [[ -n "$shopper_address" ]]; then
     export SHOPPER_ADDRESS="$shopper_address"
+elif [[ -n "$BROADCASTER_ADDRESS" ]]; then
+    export SHOPPER_ADDRESS="$BROADCASTER_ADDRESS"
+    echo -e "${GREEN}Using broadcaster address as shopper: $BROADCASTER_ADDRESS${NC}"
+else
+    echo -e "${RED}Error: Could not determine broadcaster address and no shopper address provided.${NC}"
+    echo -e "${YELLOW}Please either:${NC}"
+    echo -e "${YELLOW}  1. Provide a shopper address when prompted${NC}"
+    echo -e "${YELLOW}  2. Ensure your wallet '$WALLET' is accessible via 'cast wallet address $WALLET'${NC}"
+    echo -e "${YELLOW}  3. Set SHOPPER_ADDRESS environment variable manually${NC}"
+    exit 1
 fi
 
 if [[ $creds_mode == "direct" ]]; then
@@ -235,15 +304,49 @@ fi
 # Purchase configuration
 echo -e "\n${GREEN}=== Purchase Configuration ===${NC}"
 
-# Get web proof path
-while true; do
-    read -p "Web Proof File Path: " web_proof_path
-    if validate_file "$web_proof_path"; then
-        break
-    else
-        echo -e "${RED}Error: File does not exist. Please provide a valid file path.${NC}"
+# Get web proof path or URL - automatically use default if not provided via environment
+# Priority: 1) WEB_PROOF_PATH env var, 2) Use listing URL to generate proof, 3) script/examples/example_web_proof.json, 4) web_proof.json in current dir
+web_proof_path=""
+if [[ -n "$WEB_PROOF_PATH" ]]; then
+    # Check if it's a URL or file
+    if [[ "$WEB_PROOF_PATH" =~ ^https?:// ]]; then
+        web_proof_path="$WEB_PROOF_PATH"
+        echo -e "${GREEN}Using URL to generate web proof: $web_proof_path${NC}"
+    elif validate_file "$WEB_PROOF_PATH"; then
+        web_proof_path="$WEB_PROOF_PATH"
+        echo -e "${GREEN}Using web proof from WEB_PROOF_PATH: $web_proof_path${NC}"
     fi
-done
+fi
+
+# If not set, try to use listing URL from latest listing
+if [[ -z "$web_proof_path" ]]; then
+    LISTING_FILE="deployments/84532/Listings/latest_listing.json"
+    if [[ -f "$LISTING_FILE" ]]; then
+        LISTING_URL=$(jq -r '.url' "$LISTING_FILE" 2>/dev/null || echo "")
+        if [[ -n "$LISTING_URL" && "$LISTING_URL" != "null" ]]; then
+            web_proof_path="$LISTING_URL"
+            echo -e "${GREEN}Using listing URL to generate web proof: $web_proof_path${NC}"
+        fi
+    fi
+fi
+
+# Fallback to example file or web_proof.json
+if [[ -z "$web_proof_path" ]]; then
+    if [[ -f "script/examples/example_web_proof.json" ]]; then
+        web_proof_path="script/examples/example_web_proof.json"
+        echo -e "${YELLOW}Using example web proof file (will generate from URL if it contains one): $web_proof_path${NC}"
+    elif [[ -f "web_proof.json" ]]; then
+        web_proof_path="web_proof.json"
+        echo -e "${GREEN}Using web proof from current directory: $web_proof_path${NC}"
+    else
+        echo -e "${RED}Error: No web proof file or URL found.${NC}"
+        echo -e "${YELLOW}Please either:${NC}"
+        echo -e "${YELLOW}  1. Set WEB_PROOF_PATH to a URL or file path${NC}"
+        echo -e "${YELLOW}  2. Place a web_proof.json file in the current directory${NC}"
+        echo -e "${YELLOW}  3. Ensure a listing exists with a URL${NC}"
+        exit 1
+    fi
+fi
 
 # Get shipping state
 while true; do
@@ -256,9 +359,98 @@ while true; do
     fi
 done
 
-# Get extraction queries
-read -p "$(echo -e "Extraction Queries (JSON) ${GRAY}[{\"response.body\": [{\"jmespath\": \"orderStatus\"}]}]${NC}: ")" extraction_queries
-extraction_queries=${extraction_queries:-'{"response.body": [{"jmespath": "orderStatus"}]}'}
+# Get extraction queries (must match Treasury's EXPECTED_QUERIES_HASH)
+# First, read the expected queries hash from the Treasury contract
+echo -e "\n${BLUE}=== Reading Treasury Configuration ===${NC}"
+
+# Determine chain ID from network
+CHAIN_ID=""
+if [[ $network == "base" ]]; then
+    CHAIN_ID="84532"
+elif [[ $network == "eth" ]]; then
+    CHAIN_ID="11155111"
+elif [[ $network == "arb" ]]; then
+    CHAIN_ID="421614"
+elif [[ $network == "custom" ]]; then
+    # Try to extract chain ID from RPC URL or use default
+    CHAIN_ID="${CHAIN_ID:-84532}"
+fi
+
+# Read Treasury address from deployments.json
+DEPLOYMENTS_FILE="deployments/${CHAIN_ID}/deployments.json"
+TREASURY_ADDRESS=""
+if [[ -f "$DEPLOYMENTS_FILE" ]]; then
+    TREASURY_ADDRESS=$(jq -r '.treasury' "$DEPLOYMENTS_FILE" 2>/dev/null || echo "")
+    if [[ -n "$TREASURY_ADDRESS" && "$TREASURY_ADDRESS" != "null" && "$TREASURY_ADDRESS" != "" ]]; then
+        echo -e "${GREEN}Treasury address: $TREASURY_ADDRESS${NC}"
+        
+        # Get RPC URL for the network
+        RPC_URL_FOR_CAST=""
+        if [[ $network == "base" ]]; then
+            RPC_URL_FOR_CAST="https://sepolia.base.org"
+        elif [[ $network == "eth" ]]; then
+            RPC_URL_FOR_CAST="${RPC_URL_ETH_SEPOLIA:-https://rpc.sepolia.org}"
+        elif [[ $network == "arb" ]]; then
+            RPC_URL_FOR_CAST="${RPC_URL_ARB_SEPOLIA:-https://sepolia-rollup.arbitrum.io/rpc}"
+        elif [[ $network == "custom" ]]; then
+            RPC_URL_FOR_CAST="$rpc_url"
+        fi
+        
+        # Read EXPECTED_QUERIES_HASH from Treasury contract
+        if [[ -n "$RPC_URL_FOR_CAST" ]]; then
+            echo -e "${BLUE}Reading EXPECTED_QUERIES_HASH from Treasury contract...${NC}"
+            EXPECTED_QUERIES_HASH=$(cast call "$TREASURY_ADDRESS" "EXPECTED_QUERIES_HASH()(bytes32)" --rpc-url "$RPC_URL_FOR_CAST" 2>/dev/null || echo "")
+            
+            if [[ -n "$EXPECTED_QUERIES_HASH" && "$EXPECTED_QUERIES_HASH" != "0x0000000000000000000000000000000000000000000000000000000000000000" ]]; then
+                echo -e "${GREEN}Expected Queries Hash from Treasury:${NC} ${YELLOW}$EXPECTED_QUERIES_HASH${NC}"
+                echo -e "${YELLOW}⚠️  Your extraction queries must produce this exact queries hash when processed by vlayer.${NC}"
+            else
+                echo -e "${YELLOW}⚠️  Could not read EXPECTED_QUERIES_HASH from contract. Continuing anyway...${NC}"
+            fi
+        else
+            echo -e "${YELLOW}⚠️  RPC URL not available. Cannot read EXPECTED_QUERIES_HASH from contract.${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠️  Treasury address not found in $DEPLOYMENTS_FILE${NC}"
+    fi
+else
+    echo -e "${YELLOW}⚠️  Deployments file not found: $DEPLOYMENTS_FILE${NC}"
+    echo -e "${YELLOW}   Cannot read EXPECTED_QUERIES_HASH from contract.${NC}"
+fi
+
+# IMPORTANT: The extraction queries MUST match exactly what was used during Treasury deployment.
+# The queries hash is computed by vlayer from this JSON, and any difference in format will cause a mismatch.
+# Default to price and symbol for Binance API (testing)
+DEFAULT_QUERIES='{"response.body": {"jmespath": ["price", "symbol"]}}'
+echo -e "\n${BLUE}=== Extraction Queries Configuration ===${NC}"
+if [[ -n "$EXPECTED_QUERIES_HASH" && "$EXPECTED_QUERIES_HASH" != "0x0000000000000000000000000000000000000000000000000000000000000000" ]]; then
+    echo -e "${YELLOW}Target queries hash: $EXPECTED_QUERIES_HASH${NC}"
+fi
+echo -ne "Extraction Queries (JSON) ${GRAY}[default: price, symbol]${NC}: "
+read extraction_queries
+extraction_queries=${extraction_queries:-$DEFAULT_QUERIES}
+
+# Normalize the JSON to ensure consistent formatting (important for queries hash)
+if ! echo "$extraction_queries" | jq . > /dev/null 2>&1; then
+    echo -e "${RED}Error: Invalid JSON format for extraction queries${NC}"
+    exit 1
+fi
+
+# Normalize JSON (removes whitespace differences, ensures consistent key order)
+extraction_queries=$(echo "$extraction_queries" | jq -c .)
+
+# Convert old format to new format if needed
+if echo "$extraction_queries" | jq -e '.["response.body"] | type == "array"' > /dev/null 2>&1; then
+    extraction_queries=$(echo "$extraction_queries" | jq -c '{
+      "response.body": {
+        "jmespath": (.["response.body"] | map(.["jmespath"]))
+      }
+    }')
+    echo -e "${YELLOW}Converted extraction queries to new format${NC}"
+fi
+
+# Final normalization to ensure consistent format
+extraction_queries=$(echo "$extraction_queries" | jq -c .)
 
 # Get listing file (optional)
 read -p "$(echo -e "Listing File Path (leave empty to use latest) ${GRAY}[]${NC}: ")" listing_file
@@ -268,6 +460,10 @@ echo -e "\n${YELLOW}=== Purchase Summary ===${NC}"
 echo -e "Web Proof Path: ${GREEN}$web_proof_path${NC}"
 echo -e "Shipping State: ${GREEN}$shipping_state${NC}"
 echo -e "Extraction Queries: ${GREEN}$extraction_queries${NC}"
+if [[ -n "$EXPECTED_QUERIES_HASH" && "$EXPECTED_QUERIES_HASH" != "0x0000000000000000000000000000000000000000000000000000000000000000" ]]; then
+    echo -e "Expected Queries Hash: ${YELLOW}$EXPECTED_QUERIES_HASH${NC}"
+    echo -e "${YELLOW}⚠️  The web proof must produce this exact queries hash.${NC}"
+fi
 if [[ -n "$listing_file" ]]; then
     echo -e "Listing File: ${GREEN}$listing_file${NC}"
 else
@@ -283,7 +479,7 @@ if [[ $confirm_purchase != "y" && $confirm_purchase != "Y" ]]; then
 fi
 
 # Set environment variables for SubmitPurchaseWithWebProof.s.sol
-export WEB_PROOF_PATH="$web_proof_path"
+# Note: WEB_PROOF_PATH is no longer needed - script uses listing URL automatically
 export SHIPPING_STATE="$shipping_state"
 export EXTRACTION_QUERIES="$extraction_queries"
 if [[ -n "$listing_file" ]]; then

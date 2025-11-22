@@ -213,7 +213,9 @@ contract Treasury {
     function list(Listing calldata listing) external {
         depositFrom(listing.shopper, PAYMENT_TOKEN, listing.amount);
         locked[listing.shopper] += listing.amount;
-        fetchListing[keccak256(abi.encode(listing))] = listing;
+        bytes32 id = keccak256(abi.encode(listing));
+        fetchListing[id] = listing;
+        emit ListingCreated(listing, id);
     }
 
     function calculateId(

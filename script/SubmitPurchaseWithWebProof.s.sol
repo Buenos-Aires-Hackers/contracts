@@ -92,10 +92,29 @@ contract SubmitPurchaseWithWebProof is Script {
         console2.log("  Shopper:", listingData.shopper);
         console2.log("  Private Credentials:", vm.toString(listingData.privateCredentials));
 
-        // Get web proof file path
-        string memory webProofPath = vm.envOr("WEB_PROOF_PATH", string(""));
-        require(bytes(webProofPath).length > 0, "WEB_PROOF_PATH not set");
-        require(vm.isFile(webProofPath), "Web proof file does not exist");
+        // Use the listing URL for web proof generation (must match the listing)
+        // For testing: use Binance API URL if listing URL is Amazon (which requires auth)
+        string memory webProofPath = listingData.url;
+        
+        // Check if listing URL is Amazon (which requires authentication)
+        bool isAmazonUrl = _startsWith(listingData.url, "https://www.amazon.com");
+        
+        // For testing: if Amazon URL, use Binance API instead
+        if (isAmazonUrl) {
+            webProofPath = "https://data-api.binance.vision/api/v3/ticker/price?symbol=ETHUSDC";
+            console2.log("WARNING: Amazon URL requires authentication, using Binance API for testing:");
+            console2.log("  Test URL:", webProofPath);
+            console2.log("  Listing URL:", listingData.url);
+        } else {
+            console2.log("Using listing URL for web proof:", webProofPath);
+        }
+        
+        // Allow override via WEB_PROOF_URL environment variable
+        string memory envWebProofUrl = vm.envOr("WEB_PROOF_URL", string(""));
+        if (bytes(envWebProofUrl).length > 0) {
+            webProofPath = envWebProofUrl;
+            console2.log("Using WEB_PROOF_URL override:", webProofPath);
+        }
 
         // Get shipping state from extraction or environment
         uint8 shippingStateRaw = uint8(vm.envOr("SHIPPING_STATE", uint256(3))); // Default to DELIVERED
@@ -103,10 +122,11 @@ contract SubmitPurchaseWithWebProof is Script {
         Treasury.ShippingState shippingState = Treasury.ShippingState(shippingStateRaw);
 
         // Define extraction queries for the web proof
-        // These should match what the Treasury expects to verify
+        // For Binance API, extract price and symbol
+        // For Amazon, would extract orderStatus (but we're using Binance for testing)
         string memory extractionQueries = vm.envOr(
             "EXTRACTION_QUERIES",
-            string('{"response.body": [{"jmespath": "orderStatus"}]}')
+            string('{"response.body": {"jmespath": ["price", "symbol"]}}')
         );
 
         console2.log("Compressing web proof...");
@@ -146,10 +166,22 @@ contract SubmitPurchaseWithWebProof is Script {
             journalData.notaryKeyFingerprint == expectedNotaryFingerprint,
             "Notary fingerprint mismatch"
         );
-        require(
-            journalData.queriesHash == expectedQueriesHash,
-            "Queries hash mismatch"
-        );
+        
+        // Provide detailed error message for queries hash mismatch
+        if (journalData.queriesHash != expectedQueriesHash) {
+            console2.log("\nERROR: Queries hash mismatch!");
+            console2.log("  The extraction queries used don't match what was set during Treasury deployment.");
+            console2.log("  Extraction queries used:", extractionQueries);
+            console2.log("  Expected queries hash:");
+            console2.logBytes32(expectedQueriesHash);
+            console2.log("  Actual queries hash from web proof:");
+            console2.logBytes32(journalData.queriesHash);
+            console2.log("\n  To fix this:");
+            console2.log("  1. Check what extraction queries were used during Treasury deployment");
+            console2.log("  2. Use the EXACT same extraction queries format (JSON must match exactly)");
+            console2.log("  3. The queries hash is computed by vlayer from the extraction queries JSON");
+            revert("Queries hash mismatch - extraction queries must match Treasury deployment");
+        }
 
         // Encode purchase data for the Treasury contract
         // Format: (notaryKeyFingerprint, method, url, queriesHash, privateCredentials, shippingState)
@@ -297,6 +329,27 @@ contract SubmitPurchaseWithWebProof is Script {
             zkProof: zkProof,
             journalDataAbi: journalDataAbi
         });
+    }
+
+    /// @notice Check if a string starts with a prefix
+    /// @param str The string to check
+    /// @param prefix The prefix to check for
+    /// @return True if string starts with prefix
+    function _startsWith(string memory str, string memory prefix) internal pure returns (bool) {
+        bytes memory strBytes = bytes(str);
+        bytes memory prefixBytes = bytes(prefix);
+        
+        if (strBytes.length < prefixBytes.length) {
+            return false;
+        }
+        
+        for (uint256 i = 0; i < prefixBytes.length; i++) {
+            if (strBytes[i] != prefixBytes[i]) {
+                return false;
+            }
+        }
+        
+        return true;
     }
 
     /// @notice Decode journal data from ABI-encoded bytes

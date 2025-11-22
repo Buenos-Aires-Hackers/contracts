@@ -69,10 +69,14 @@ contract List is Script {
 
         Treasury treasury = Treasury(treasuryAddress);
 
-        // Get listing parameters - use hardcoded dummy data by default
-        string memory url = vm.envOr("LISTING_URL", string("https://www.amazon.com/gp/your-account/order-details/?orderID=111-1234567-8901234"));
+        // Get listing parameters - use Binance API for testing
+        string memory url = vm.envOr("LISTING_URL", string("https://data-api.binance.vision/api/v3/ticker/price?symbol=ETHUSDC"));
         uint256 amount = vm.envOr("LISTING_AMOUNT", uint256(100000000)); // Default: 100 USDC (6 decimals)
-        address shopper = vm.envOr("SHOPPER_ADDRESS", msg.sender);
+        
+        // Shopper should be the broadcaster's address (set by shell script via SHOPPER_ADDRESS env var)
+        // This ensures the shopper's private key is available for signing transactions
+        address shopper = vm.envOr("SHOPPER_ADDRESS", address(0));
+        require(shopper != address(0), "SHOPPER_ADDRESS must be set (should be the broadcaster address)");
         
         // Get private credentials (can be computed from raw credentials or provided directly)
         bytes32 privateCredentials = vm.envOr("PRIVATE_CREDENTIALS", bytes32(0));
@@ -130,22 +134,48 @@ contract List is Script {
         // Get payment token address
         address paymentToken = treasury.PAYMENT_TOKEN();
         
-        // Start broadcast for both approval and listing
+        // Start broadcast - uses the account from --account flag
+        // The shell script ensures SHOPPER_ADDRESS matches the broadcaster address from --account
+        // This ensures all transactions (approve, list) are from the shopper address
         vm.startBroadcast();
         
-        // Approve payment token if needed (for ERC20)
+        console2.log("Broadcasting from shopper address:", shopper);
+        console2.log("Note: Shopper must match the --account address for transactions to work");
+        
+        // Handle payment token (mint if needed, then approve)
         if (paymentToken != address(0)) {
             IERC20 token = IERC20(paymentToken);
-            uint256 allowance = token.allowance(shopper, address(treasury));
+            uint256 balance = token.balanceOf(shopper);
             
+            // Check if we need to mint tokens (for mock tokens)
+            if (balance < amount) {
+                uint256 mintAmount = amount - balance;
+                // Add some extra to cover gas and future transactions
+                mintAmount = mintAmount + (amount / 10); // Add 10% buffer
+                
+                // Try to mint tokens (will succeed if it's a mock token with mint function)
+                try IMintable(paymentToken).mint(shopper, mintAmount) {
+                    console2.log("Minted", mintAmount, "tokens to shopper");
+                } catch {
+                    console2.log("Token does not support minting, assuming sufficient balance from external source");
+                }
+            }
+            
+            // Approve payment token if needed - done by the shopper (current broadcaster)
+            uint256 allowance = token.allowance(shopper, address(treasury));
             if (allowance < amount) {
-                console2.log("Approving payment token...");
+                console2.log("Approving payment token as shopper...");
                 token.approve(address(treasury), amount);
                 console2.log("Approved", amount, "tokens");
+                
+                // Verify the approval was set
+                uint256 newAllowance = token.allowance(shopper, address(treasury));
+                console2.log("Verified allowance:", newAllowance);
+                require(newAllowance >= amount, "Approval failed");
             }
         }
 
-        // Create the listing
+        // Create the listing - this will transferFrom the shopper (current broadcaster)
         treasury.list(listing);
         
         vm.stopBroadcast();
