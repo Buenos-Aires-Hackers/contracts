@@ -139,36 +139,8 @@ contract SubmitPurchaseWithWebProof is Script {
         console2.logBytes(journalData.extractedValues);
 
         // Decode extracted values (fulfillment_status only)
-        // Try different decoding strategies
-        string memory fulfillmentStatus;
-        bool decoded = false;
-
-        // Strategy 1: Try to decode as string array (single element)
-        try this.decodeExtractedValues(journalData.extractedValues) returns (string[] memory values) {
-            console2.log("Successfully decoded as string array with", values.length, "elements");
-            require(values.length == 1, "Expected 1 extracted value (fulfillment_status)");
-            fulfillmentStatus = values[0];
-            decoded = true;
-        } catch Error(string memory reason) {
-            console2.log("Failed to decode as string array:", reason);
-        } catch (bytes memory) {
-            console2.log("Failed to decode as string array (no reason)");
-        }
-
-        // Strategy 2: Try to decode as a single string
-        if (!decoded) {
-            try this.decodeExtractedValuesAsSingleString(journalData.extractedValues) returns (string memory val) {
-                console2.log("Successfully decoded as single string:", val);
-                fulfillmentStatus = val;
-                decoded = true;
-            } catch Error(string memory reason) {
-                console2.log("Failed to decode as single string:", reason);
-            } catch (bytes memory) {
-                console2.log("Failed to decode as single string (no reason)");
-            }
-        }
-
-        require(decoded, "Failed to decode extractedValues with any strategy");
+        // vlayer returns raw string bytes, not ABI-encoded
+        string memory fulfillmentStatus = string(journalData.extractedValues);
 
         console2.log("\nExtracted Values:");
         console2.log("  Fulfillment Status:", fulfillmentStatus);
@@ -214,20 +186,13 @@ contract SubmitPurchaseWithWebProof is Script {
 
         console2.log("\n[OK] Fulfillment status verified: fulfilled");
 
-        // Encode purchase data for the Treasury contract
-        // Format: (notaryKeyFingerprint, method, url, queriesHash, privateCredentials)
-        bytes memory purchaseData = abi.encode(
-            journalData.notaryKeyFingerprint,
-            journalData.method,
-            journalData.url,
-            journalData.queriesHash,
-            listingData.privateCredentials
-        );
+        // purchaseData is the journalDataAbi directly from vlayer
+        // Format: (notaryKeyFingerprint, method, url, timestamp, queriesHash, extractedValues)
+        bytes memory purchaseData = vlayerResponse.journalDataAbi;
 
         console2.log("\nSubmitting purchase:");
         console2.log("  Listing ID:", vm.toString(listingData.listingId));
-        console2.log("  Private Credentials:");
-        console2.logBytes32(listingData.privateCredentials);
+        console2.log("  Purchase data length:", purchaseData.length);
 
         // Submit the purchase
         vm.startBroadcast();
@@ -401,21 +366,5 @@ contract SubmitPurchaseWithWebProof is Script {
             queriesHash: queriesHash,
             extractedValues: extractedValues
         });
-    }
-
-    /// @notice Helper function to decode extracted values as string array
-    /// @dev Must be external to use in try-catch
-    /// @param data ABI-encoded extracted values
-    /// @return Array of extracted strings
-    function decodeExtractedValues(bytes memory data) external pure returns (string[] memory) {
-        return abi.decode(data, (string[]));
-    }
-
-    /// @notice Helper function to decode extracted values as single string
-    /// @dev Must be external to use in try-catch
-    /// @param data ABI-encoded extracted values
-    /// @return Single extracted string
-    function decodeExtractedValuesAsSingleString(bytes memory data) external pure returns (string memory) {
-        return abi.decode(data, (string));
     }
 }

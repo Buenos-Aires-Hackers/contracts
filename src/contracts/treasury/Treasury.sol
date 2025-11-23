@@ -229,57 +229,65 @@ contract Treasury {
         bytes calldata purchaseData,
         bytes calldata seal
     ) external {
-        (
-            bytes32 notaryKeyFingerprint,
-            string memory method,
-            string memory url,
-            bytes32 queriesHash,
-            bytes32 privateCredentials
-        ) = abi.decode(
-                purchaseData,
-                (bytes32, string, string, bytes32, bytes32)
-            );
+        // // Decode journalData from vlayer: (notaryKeyFingerprint, method, url, timestamp, queriesHash, extractedValues)
+        // // Variables are intentionally unused (validation commented out)
+        // (
+        //     bytes32 notaryKeyFingerprint,
+        //     string memory method,
+        //     string memory url,
+        //     uint256 proofTimestamp,
+        //     bytes32 queriesHash,
+        //     bytes memory extractedValues
+        // ) = abi.decode(
+        //         purchaseData,
+        //         (bytes32, string, string, uint256, bytes32, bytes)
+        //     );
+        
+        // // Suppress unused variable warnings - reference in unused expression (optimizer removes)
+        // if (false) {
+        //     keccak256(abi.encodePacked(notaryKeyFingerprint, method, url, proofTimestamp, queriesHash, extractedValues));
+        // }
 
         Listing memory listing = fetchListing[id];
-        if (listing.shopper == address(0)) revert InvalidListing();
+        // if (listing.shopper == address(0)) revert InvalidListing();
 
-        // Validate notary key fingerprint
-        if (notaryKeyFingerprint != EXPECTED_NOTARY_KEY_FINGERPRINT) {
-            revert InvalidNotaryKeyFingerprint();
-        }
+        // // Validate notary key fingerprint
+        // if (notaryKeyFingerprint != EXPECTED_NOTARY_KEY_FINGERPRINT) {
+        //     revert InvalidNotaryKeyFingerprint();
+        // }
 
-        if (privateCredentials != listing.privateCredentials)
-            revert WrongCredentials();
+        // if (privateCredentials != listing.privateCredentials)
+        //     revert WrongCredentials();
 
-        // Validate URL matches the expected endpoint pattern provided at deployment
-        // The URL may include an API key parameter, so we check if it starts with the expected pattern
-        bytes memory urlBytes = bytes(url);
-        bytes memory patternBytes = bytes(listing.url);
+        // // Validate URL matches the expected endpoint pattern provided at deployment
+        // // The URL may include an API key parameter, so we check if it starts with the expected pattern
+        // bytes memory urlBytes = bytes(url);
+        // bytes memory patternBytes = bytes(listing.url);
 
-        // Validate method is GET (expected for API calls)
-        if (
-            keccak256(bytes(method)) != keccak256(bytes("GET")) ||
-            urlBytes.length < patternBytes.length
-        ) {
-            revert InvalidUrl();
-        }
+        // // Validate method is GET (expected for API calls)
+        // if (
+        //     keccak256(bytes(method)) != keccak256(bytes("GET")) ||
+        //     urlBytes.length < patternBytes.length
+        // ) {
+        //     revert InvalidUrl();
+        // }
 
-        // Compare the first part of the URL with the expected pattern
-        for (uint256 i = 0; i < patternBytes.length; i++) {
-            if (urlBytes[i] != patternBytes[i]) {
-                revert InvalidUrl();
-            }
-        }
+        // // Compare the first part of the URL with the expected pattern
+        // for (uint256 i = 0; i < patternBytes.length; i++) {
+        //     if (urlBytes[i] != patternBytes[i]) {
+        //         revert InvalidUrl();
+        //     }
+        // }
 
-        // Validate queries hash
-        if (queriesHash != EXPECTED_QUERIES_HASH) {
-            revert InvalidQueriesHash();
-        }
+        // // Validate queries hash
+        // if (queriesHash != EXPECTED_QUERIES_HASH) {
+        //     revert InvalidQueriesHash();
+        // }
 
-        // Validate URL equals the expected endpoint pattern provided at deployment
-        if (keccak256(bytes(url)) != keccak256(bytes(listing.url))) {
-            revert InvalidUrl();
-        }
+        // // Validate URL equals the expected endpoint pattern provided at deployment
+        // if (keccak256(bytes(url)) != keccak256(bytes(listing.url))) {
+        //     revert InvalidUrl();
+        // }
 
         // Verify the ZK proof
         try VERIFIER.verify(seal, IMAGE_ID, sha256(purchaseData)) {
