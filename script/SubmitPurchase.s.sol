@@ -25,11 +25,6 @@ contract SubmitPurchase is Script {
         require(bytes(url).length > 0, "PURCHASE_URL not set");
         bytes32 queriesHash = vm.envBytes32("QUERIES_HASH");
         bytes32 privateCredentials = vm.envBytes32("PRIVATE_CREDENTIALS");
-        
-        // Get shipping state (0=IN_TRANSIT, 1=CANCELED, 2=PENDING, 3=DELIVERED)
-        uint8 shippingStateRaw = uint8(vm.envOr("SHIPPING_STATE", uint256(3))); // Default to DELIVERED
-        require(shippingStateRaw <= 3, "Invalid shipping state (0-3)");
-        Treasury.ShippingState shippingState = Treasury.ShippingState(shippingStateRaw);
 
         // Get ZK proof seal
         bytes memory seal = vm.envBytes("ZK_PROOF_SEAL");
@@ -41,8 +36,7 @@ contract SubmitPurchase is Script {
             method,
             url,
             queriesHash,
-            privateCredentials,
-            shippingState
+            privateCredentials
         );
 
         console2.log("Submitting purchase:");
@@ -53,7 +47,6 @@ contract SubmitPurchase is Script {
         console2.log("  URL:", url);
         console2.log("  Queries Hash:");
         console2.logBytes32(queriesHash);
-        console2.log("  Shipping State:", uint256(shippingState));
         console2.log("  Seal length:", seal.length);
 
         // Submit the purchase

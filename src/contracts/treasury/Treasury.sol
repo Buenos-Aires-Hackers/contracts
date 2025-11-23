@@ -35,16 +35,10 @@ import {IRiscZeroVerifier} from "@risc0/contracts/IRiscZeroVerifier.sol";
 contract Treasury {
     struct Listing {
         string url;
+        string productId;
         uint256 amount;
         address shopper;
         bytes32 privateCredentials;
-    }
-
-    enum ShippingState {
-        IN_TRANSIT,
-        CANCELED,
-        PENDING,
-        DELIVERED
     }
 
     struct PrivateCredentialsRaw {
@@ -224,7 +218,9 @@ contract Treasury {
         id = keccak256(abi.encode(listing));
     }
 
-    function createPrivateCredentials(PrivateCredentialsRaw calldata rawCredentials) external pure returns (bytes32 privateCredentials) {
+    function createPrivateCredentials(
+        PrivateCredentialsRaw calldata rawCredentials
+    ) external pure returns (bytes32 privateCredentials) {
         privateCredentials = keccak256(abi.encode(rawCredentials));
     }
 
@@ -238,9 +234,11 @@ contract Treasury {
             string memory method,
             string memory url,
             bytes32 queriesHash,
-            bytes32 privateCredentials,
-            ShippingState shippingState
-        ) = abi.decode(purchaseData, (bytes32, string, string, bytes32, bytes32, ShippingState));
+            bytes32 privateCredentials
+        ) = abi.decode(
+                purchaseData,
+                (bytes32, string, string, bytes32, bytes32)
+            );
 
         Listing memory listing = fetchListing[id];
         if (listing.shopper == address(0)) revert InvalidListing();
@@ -250,8 +248,8 @@ contract Treasury {
             revert InvalidNotaryKeyFingerprint();
         }
 
-        if (shippingState != ShippingState.DELIVERED) revert OrderWasntDelivered();
-        if (privateCredentials != listing.privateCredentials) revert WrongCredentials();
+        if (privateCredentials != listing.privateCredentials)
+            revert WrongCredentials();
 
         // Validate URL matches the expected endpoint pattern provided at deployment
         // The URL may include an API key parameter, so we check if it starts with the expected pattern

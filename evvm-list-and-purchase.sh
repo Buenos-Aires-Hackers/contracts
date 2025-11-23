@@ -158,8 +158,8 @@ fi
 echo -e "\n${GREEN}=== Listing Configuration ===${NC}"
 
 # Get listing URL
-read -p "$(echo -e "Listing URL ${GRAY}[https://data-api.binance.vision/api/v3/ticker/price?symbol=ETHUSDC]${NC}: ")" listing_url
-listing_url=${listing_url:-"https://data-api.binance.vision/api/v3/ticker/price?symbol=ETHUSDC"}
+read -p "$(echo -e "Listing URL ${GRAY}[https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227633.json]${NC}: ")" listing_url
+listing_url=${listing_url:-"https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227633.json"}
 
 # Get listing amount
 while true; do
@@ -420,13 +420,13 @@ fi
 
 # IMPORTANT: The extraction queries MUST match exactly what was used during Treasury deployment.
 # The queries hash is computed by vlayer from this JSON, and any difference in format will cause a mismatch.
-# Default to price and symbol for Binance API (testing)
-DEFAULT_QUERIES='{"response.body": {"jmespath": ["price", "symbol"]}}'
+# Default to Shopify order fulfillment status only
+DEFAULT_QUERIES='{"response.body": {"jmespath": ["order.fulfillment_status"]}}'
 echo -e "\n${BLUE}=== Extraction Queries Configuration ===${NC}"
 if [[ -n "$EXPECTED_QUERIES_HASH" && "$EXPECTED_QUERIES_HASH" != "0x0000000000000000000000000000000000000000000000000000000000000000" ]]; then
     echo -e "${YELLOW}Target queries hash: $EXPECTED_QUERIES_HASH${NC}"
 fi
-echo -ne "Extraction Queries (JSON) ${GRAY}[default: price, symbol]${NC}: "
+echo -ne "Extraction Queries (JSON) ${GRAY}[default: order.fulfillment_status]${NC}: "
 read extraction_queries
 extraction_queries=${extraction_queries:-$DEFAULT_QUERIES}
 

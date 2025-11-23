@@ -93,22 +93,9 @@ contract SubmitPurchaseWithWebProof is Script {
         console2.log("  Private Credentials:", vm.toString(listingData.privateCredentials));
 
         // Use the listing URL for web proof generation (must match the listing)
-        // For testing: use Binance API URL if listing URL is Amazon (which requires auth)
         string memory webProofPath = listingData.url;
-        
-        // Check if listing URL is Amazon (which requires authentication)
-        bool isAmazonUrl = _startsWith(listingData.url, "https://www.amazon.com");
-        
-        // For testing: if Amazon URL, use Binance API instead
-        if (isAmazonUrl) {
-            webProofPath = "https://data-api.binance.vision/api/v3/ticker/price?symbol=ETHUSDC";
-            console2.log("WARNING: Amazon URL requires authentication, using Binance API for testing:");
-            console2.log("  Test URL:", webProofPath);
-            console2.log("  Listing URL:", listingData.url);
-        } else {
-            console2.log("Using listing URL for web proof:", webProofPath);
-        }
-        
+        console2.log("Using listing URL for web proof:", webProofPath);
+
         // Allow override via WEB_PROOF_URL environment variable
         string memory envWebProofUrl = vm.envOr("WEB_PROOF_URL", string(""));
         if (bytes(envWebProofUrl).length > 0) {
@@ -116,17 +103,11 @@ contract SubmitPurchaseWithWebProof is Script {
             console2.log("Using WEB_PROOF_URL override:", webProofPath);
         }
 
-        // Get shipping state from extraction or environment
-        uint8 shippingStateRaw = uint8(vm.envOr("SHIPPING_STATE", uint256(3))); // Default to DELIVERED
-        require(shippingStateRaw <= 3, "Invalid shipping state (0-3)");
-        Treasury.ShippingState shippingState = Treasury.ShippingState(shippingStateRaw);
-
         // Define extraction queries for the web proof
-        // For Binance API, extract price and symbol
-        // For Amazon, would extract orderStatus (but we're using Binance for testing)
+        // For Shopify API, extract fulfillment_status only
         string memory extractionQueries = vm.envOr(
             "EXTRACTION_QUERIES",
-            string('{"response.body": {"jmespath": ["price", "symbol"]}}')
+            string('{"response.body": {"jmespath": ["order.fulfillment_status"]}}')
         );
 
         console2.log("Compressing web proof...");
@@ -151,6 +132,46 @@ contract SubmitPurchaseWithWebProof is Script {
         console2.log("  Timestamp:", journalData.timestamp);
         console2.log("  Queries Hash:");
         console2.logBytes32(journalData.queriesHash);
+
+        // Debug: Log raw extracted values
+        console2.log("\nRaw Extracted Values:");
+        console2.log("  Length:", journalData.extractedValues.length);
+        console2.logBytes(journalData.extractedValues);
+
+        // Decode extracted values (fulfillment_status only)
+        // Try different decoding strategies
+        string memory fulfillmentStatus;
+        bool decoded = false;
+
+        // Strategy 1: Try to decode as string array (single element)
+        try this.decodeExtractedValues(journalData.extractedValues) returns (string[] memory values) {
+            console2.log("Successfully decoded as string array with", values.length, "elements");
+            require(values.length == 1, "Expected 1 extracted value (fulfillment_status)");
+            fulfillmentStatus = values[0];
+            decoded = true;
+        } catch Error(string memory reason) {
+            console2.log("Failed to decode as string array:", reason);
+        } catch (bytes memory) {
+            console2.log("Failed to decode as string array (no reason)");
+        }
+
+        // Strategy 2: Try to decode as a single string
+        if (!decoded) {
+            try this.decodeExtractedValuesAsSingleString(journalData.extractedValues) returns (string memory val) {
+                console2.log("Successfully decoded as single string:", val);
+                fulfillmentStatus = val;
+                decoded = true;
+            } catch Error(string memory reason) {
+                console2.log("Failed to decode as single string:", reason);
+            } catch (bytes memory) {
+                console2.log("Failed to decode as single string (no reason)");
+            }
+        }
+
+        require(decoded, "Failed to decode extractedValues with any strategy");
+
+        console2.log("\nExtracted Values:");
+        console2.log("  Fulfillment Status:", fulfillmentStatus);
 
         // Verify this matches the Treasury's expected values
         bytes32 expectedNotaryFingerprint = treasury.EXPECTED_NOTARY_KEY_FINGERPRINT();
@@ -183,22 +204,30 @@ contract SubmitPurchaseWithWebProof is Script {
             revert("Queries hash mismatch - extraction queries must match Treasury deployment");
         }
 
+        // Verify fulfillment status is "fulfilled"
+        if (keccak256(bytes(fulfillmentStatus)) != keccak256(bytes("fulfilled"))) {
+            console2.log("\nERROR: Order was not fulfilled!");
+            console2.log("  Expected: fulfilled");
+            console2.log("  Actual:", fulfillmentStatus);
+            revert("Order must be fulfilled to complete purchase");
+        }
+
+        console2.log("\n[OK] Fulfillment status verified: fulfilled");
+
         // Encode purchase data for the Treasury contract
-        // Format: (notaryKeyFingerprint, method, url, queriesHash, privateCredentials, shippingState)
+        // Format: (notaryKeyFingerprint, method, url, queriesHash, privateCredentials)
         bytes memory purchaseData = abi.encode(
             journalData.notaryKeyFingerprint,
             journalData.method,
             journalData.url,
             journalData.queriesHash,
-            listingData.privateCredentials,
-            shippingState
+            listingData.privateCredentials
         );
 
         console2.log("\nSubmitting purchase:");
         console2.log("  Listing ID:", vm.toString(listingData.listingId));
         console2.log("  Private Credentials:");
         console2.logBytes32(listingData.privateCredentials);
-        console2.log("  Shipping State:", uint256(shippingState));
 
         // Submit the purchase
         vm.startBroadcast();
@@ -206,7 +235,7 @@ contract SubmitPurchaseWithWebProof is Script {
         vm.stopBroadcast();
 
         // Save purchase data
-        _savePurchaseData(listingData, journalData, msg.sender, shippingState);
+        _savePurchaseData(listingData, journalData, msg.sender);
 
         console2.log("\nPurchase submitted successfully!");
         console2.log("Purchase data saved to:", PURCHASE_FILE);
@@ -254,8 +283,7 @@ contract SubmitPurchaseWithWebProof is Script {
     function _savePurchaseData(
         ListingData memory listingData,
         JournalData memory journalData,
-        address merchant,
-        Treasury.ShippingState shippingState
+        address merchant
     ) internal {
         // Generate unique filename for this purchase
         uint256 timestamp = block.timestamp;
@@ -276,7 +304,6 @@ contract SubmitPurchaseWithWebProof is Script {
         json = vm.serializeString(objectKey, "url", journalData.url);
         json = vm.serializeBytes32(objectKey, "notaryKeyFingerprint", journalData.notaryKeyFingerprint);
         json = vm.serializeBytes32(objectKey, "queriesHash", journalData.queriesHash);
-        json = vm.serializeUint(objectKey, "shippingState", uint256(shippingState));
         json = vm.serializeUint(objectKey, "timestamp", timestamp);
         json = vm.serializeUint(objectKey, "proofTimestamp", journalData.timestamp);
         json = vm.serializeUint(objectKey, "chainId", block.chainid);
@@ -374,5 +401,21 @@ contract SubmitPurchaseWithWebProof is Script {
             queriesHash: queriesHash,
             extractedValues: extractedValues
         });
+    }
+
+    /// @notice Helper function to decode extracted values as string array
+    /// @dev Must be external to use in try-catch
+    /// @param data ABI-encoded extracted values
+    /// @return Array of extracted strings
+    function decodeExtractedValues(bytes memory data) external pure returns (string[] memory) {
+        return abi.decode(data, (string[]));
+    }
+
+    /// @notice Helper function to decode extracted values as single string
+    /// @dev Must be external to use in try-catch
+    /// @param data ABI-encoded extracted values
+    /// @return Single extracted string
+    function decodeExtractedValuesAsSingleString(bytes memory data) external pure returns (string memory) {
+        return abi.decode(data, (string));
     }
 }

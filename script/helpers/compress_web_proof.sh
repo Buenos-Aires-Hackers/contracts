@@ -60,17 +60,34 @@ VLAYER_API_KEY="${VLAYER_API_KEY:-Eb1cLVBBZIcoidDWZSQ9AM53RgUJo7qLyeBcpjqbgDITb3
 if [[ "$INPUT" =~ ^https?:// ]]; then
     # It's a URL - generate web proof first
     WEB_PROVER_URL="${WEB_PROVER_URL:-https://web-prover.vlayer.xyz/api/v1/prove}"
-    
+
     echo "🌐 Generating web proof for: $INPUT" >&2
     echo "   Using prover: $WEB_PROVER_URL" >&2
-    
+
+    # Prepare custom headers (default to Shopify if URL contains myshopify.com)
+    HEADERS_JSON="[]"
+    if [[ -n "$PROOF_HEADERS" ]]; then
+        # Use provided headers (expected format: JSON array of strings)
+        HEADERS_JSON="$PROOF_HEADERS"
+        echo "   Using custom headers: $HEADERS_JSON" >&2
+    elif [[ "$INPUT" =~ myshopify\.com ]]; then
+        # Auto-detect Shopify and add required headers
+        if [[ -z "$SHOPIFY_ACCESS_TOKEN" ]]; then
+            echo "   ERROR: SHOPIFY_ACCESS_TOKEN environment variable is required for Shopify URLs" >&2
+            echo "   Set it in your .env file or export it before running this script" >&2
+            exit 1
+        fi
+        HEADERS_JSON="[\"X-Shopify-Access-Token: $SHOPIFY_ACCESS_TOKEN\", \"Content-Type: application/json\"]"
+        echo "   Detected Shopify URL, using access token" >&2
+    fi
+
     # Call /prove endpoint
     PROVE_RESPONSE=$(curl -s -X POST \
       "$WEB_PROVER_URL" \
       -H "Content-Type: application/json" \
       -H "x-client-id: $VLAYER_CLIENT_ID" \
       -H "Authorization: Bearer $VLAYER_API_KEY" \
-      -d "{\"url\": \"$INPUT\", \"headers\": []}" 2>&1)
+      -d "{\"url\": \"$INPUT\", \"headers\": $HEADERS_JSON}" 2>&1)
     
     # Check if request was successful
     if ! echo "$PROVE_RESPONSE" | jq -e '.success == true' > /dev/null 2>&1 && ! echo "$PROVE_RESPONSE" | jq -e '.data' > /dev/null 2>&1; then

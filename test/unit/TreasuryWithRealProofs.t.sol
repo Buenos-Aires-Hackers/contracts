@@ -62,7 +62,8 @@ contract TreasuryWithRealProofs is BaseTest, RiscZeroTestHelper {
             })
         );
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-1234567-8901234",
+            url: "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227633.json",
+            productId: "15334575571313",
             amount: listingAmount,
             shopper: alice,
             privateCredentials: credentials
@@ -76,7 +77,7 @@ contract TreasuryWithRealProofs is BaseTest, RiscZeroTestHelper {
         bytes32 listingId = treasury.calculateId(listing);
 
         // Step 2: Generate a real ZK proof for the purchase
-        // Your zkVM program should verify the Amazon purchase and extract relevant data
+        // Your zkVM program should verify the Shopify order fulfillment and extract relevant data
         // NOTE: Update this to match your zkVM program's expected input format
         bytes memory purchaseInput = abi.encode(listing.url);
         
@@ -91,15 +92,14 @@ contract TreasuryWithRealProofs is BaseTest, RiscZeroTestHelper {
         // Step 3: Decode the journal to get the purchase data
         // The journal format should match what your zkVM program outputs
         // NOTE: Update this to match your zkVM program's output format
-        // Treasury expects: (bytes32 notaryKeyFingerprint, string method, string url, bytes32 queriesHash, bytes32 privateCredentials, ShippingState)
+        // Treasury expects: (bytes32 notaryKeyFingerprint, string method, string url, bytes32 queriesHash, bytes32 privateCredentials)
         (
             bytes32 notaryKeyFingerprint,
             string memory method,
             string memory url,
             bytes32 queriesHash,
-            bytes32 privateCredentials,
-            Treasury.ShippingState shippingState
-        ) = abi.decode(journal, (bytes32, string, string, bytes32, bytes32, Treasury.ShippingState));
+            bytes32 privateCredentials
+        ) = abi.decode(journal, (bytes32, string, string, bytes32, bytes32));
 
         // Step 4: Prepare purchase data (must match Treasury's expected format)
         bytes memory purchaseData = abi.encode(
@@ -107,8 +107,7 @@ contract TreasuryWithRealProofs is BaseTest, RiscZeroTestHelper {
             method,
             url,
             queriesHash,
-            privateCredentials,
-            shippingState
+            privateCredentials
         );
 
         // Verify the journal hash matches what we'll pass to verify()
@@ -142,7 +141,7 @@ contract TreasuryWithRealProofs is BaseTest, RiscZeroTestHelper {
         assertEq(evvm.getBalance(merchant, address(usdc)), merchantBalanceBefore + listingAmount);
 
         // Verify listing was deleted
-        (, , address shopper, ) = treasury.fetchListing(listingId);
+        (, , , address shopper, ) = treasury.fetchListing(listingId);
         assertEq(shopper, address(0));
     }
 
@@ -151,28 +150,27 @@ contract TreasuryWithRealProofs is BaseTest, RiscZeroTestHelper {
      * @dev This should match your zkVM program's expected input format
      */
     function generatePurchaseProof(
-        string memory amazonUrl
+        string memory shopifyUrl
     ) internal returns (bytes memory purchaseData, bytes memory seal) {
         // Prepare input for your zkVM program
         // NOTE: Update this to match your zkVM program's expected input
-        bytes memory input = abi.encode(amazonUrl);
+        bytes memory input = abi.encode(shopifyUrl);
 
         // Generate proof
         (bytes memory journal, bytes memory sealGenerated) = generateProof(ELF_PATH, input);
         
         // Decode journal to get purchase data
-        // Treasury expects: (bytes32, string, string, bytes32, bytes32, ShippingState)
+        // Treasury expects: (bytes32, string, string, bytes32, bytes32)
         (
             bytes32 notaryKeyFingerprint,
             string memory method,
             string memory url,
             bytes32 queriesHash,
-            bytes32 privateCredentials,
-            Treasury.ShippingState shippingState
-        ) = abi.decode(journal, (bytes32, string, string, bytes32, bytes32, Treasury.ShippingState));
+            bytes32 privateCredentials
+        ) = abi.decode(journal, (bytes32, string, string, bytes32, bytes32));
 
         // Re-encode as purchaseData for Treasury
-        purchaseData = abi.encode(notaryKeyFingerprint, method, url, queriesHash, privateCredentials, shippingState);
+        purchaseData = abi.encode(notaryKeyFingerprint, method, url, queriesHash, privateCredentials);
         
         return (purchaseData, sealGenerated);
     }

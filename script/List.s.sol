@@ -69,8 +69,8 @@ contract List is Script {
 
         Treasury treasury = Treasury(treasuryAddress);
 
-        // Get listing parameters - use Binance API for testing
-        string memory url = vm.envOr("LISTING_URL", string("https://data-api.binance.vision/api/v3/ticker/price?symbol=ETHUSDC"));
+        // Get listing parameters - use Shopify API for order fulfillment verification
+        string memory url = vm.envOr("LISTING_URL", string("https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227633.json"));
         uint256 amount = vm.envOr("LISTING_AMOUNT", uint256(100000000)); // Default: 100 USDC (6 decimals)
         
         // Shopper should be the broadcaster's address (set by shell script via SHOPPER_ADDRESS env var)
@@ -102,9 +102,13 @@ contract List is Script {
             privateCredentials = treasury.createPrivateCredentials(rawCredentials);
         }
 
+        // Get product ID from environment (default to Shopify test product)
+        string memory productId = vm.envOr("PRODUCT_ID", string("15334575571313"));
+
         // Create listing
         Treasury.Listing memory listing = Treasury.Listing({
             url: url,
+            productId: productId,
             amount: amount,
             shopper: shopper,
             privateCredentials: privateCredentials

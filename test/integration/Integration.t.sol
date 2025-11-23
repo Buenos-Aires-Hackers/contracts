@@ -73,7 +73,8 @@ contract IntegrationTest is BaseTest {
             })
         );
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-1234567-8901234",
+            url: "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227633.json",
+            productId: "15334575571313",
             amount: listingAmount,
             shopper: alice,
             privateCredentials: credentials
@@ -86,7 +87,7 @@ contract IntegrationTest is BaseTest {
 
         // 3. Verify listing was created and balance increased
         bytes32 listingId = treasury.calculateId(listing);
-        (string memory url, uint256 amount, address shopper, bytes32 privateCredentials) = treasury.fetchListing(listingId);
+        (string memory url, string memory productId, uint256 amount, address shopper, bytes32 privateCredentials) = treasury.fetchListing(listingId);
         assertEq(url, listing.url);
         assertEq(amount, listingAmount);
         assertEq(shopper, alice);

@@ -112,7 +112,8 @@ contract TreasuryTest is BaseTest {
             })
         );
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-1234567-8901234",
+            url: "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227633.json",
+            productId: "15334575571313",
             amount: listingAmount,
             shopper: alice,
             privateCredentials: credentials
@@ -130,7 +131,7 @@ contract TreasuryTest is BaseTest {
 
         // Verify listing was stored
         bytes32 listingId = treasury.calculateId(listing);
-        (string memory url, uint256 amount, address shopper, bytes32 privateCredentials) = treasury.fetchListing(listingId);
+        (string memory url, string memory productId, uint256 amount, address shopper, bytes32 privateCredentials) = treasury.fetchListing(listingId);
         assertEq(url, listing.url);
         assertEq(amount, listing.amount);
         assertEq(shopper, listing.shopper);
@@ -149,7 +150,8 @@ contract TreasuryTest is BaseTest {
             })
         );
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-2222222-3333333",
+            url: "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227634.json",
+            productId: "15334575571313",
             amount: 100 * 10 ** 6,
             shopper: alice,
             privateCredentials: credentials
@@ -177,7 +179,8 @@ contract TreasuryTest is BaseTest {
             })
         );
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-2345678-9012345",
+            url: "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227635.json",
+            productId: "15334575571313",
             amount: listingAmount,
             shopper: alice,
             privateCredentials: credentials
@@ -196,8 +199,7 @@ contract TreasuryTest is BaseTest {
             "GET",
             listing.url,
             EXPECTED_QUERIES_HASH,
-            credentials,
-            Treasury.ShippingState.DELIVERED
+            credentials
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
@@ -223,10 +225,9 @@ contract TreasuryTest is BaseTest {
         bytes memory purchaseData = abi.encode(
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
-            "https://www.amazon.com/gp/your-account/order-details/?orderID=111-3456789-0123456",
+            "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227636.json",
             EXPECTED_QUERIES_HASH,
-            bytes32(0),
-            Treasury.ShippingState.DELIVERED
+            bytes32(0)
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
@@ -248,7 +249,8 @@ contract TreasuryTest is BaseTest {
             })
         );
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-4567890-1234567",
+            url: "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227637.json",
+            productId: "15334575571313",
             amount: 100 * 10 ** 6,
             shopper: alice,
             privateCredentials: credentials
@@ -266,8 +268,7 @@ contract TreasuryTest is BaseTest {
             "GET",
             listing.url,
             EXPECTED_QUERIES_HASH,
-            credentials,
-            Treasury.ShippingState.DELIVERED
+            credentials
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
@@ -289,7 +290,8 @@ contract TreasuryTest is BaseTest {
             })
         );
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-5678901-2345678",
+            url: "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227638.json",
+            productId: "15334575571313",
             amount: 100 * 10 ** 6,
             shopper: alice,
             privateCredentials: credentials
@@ -307,8 +309,7 @@ contract TreasuryTest is BaseTest {
             "GET",
             listing.url,
             bytes32(uint256(999)), // Wrong queries hash
-            credentials,
-            Treasury.ShippingState.DELIVERED
+            credentials
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
@@ -330,7 +331,8 @@ contract TreasuryTest is BaseTest {
             })
         );
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-6789012-3456789",
+            url: "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227639.json",
+            productId: "15334575571313",
             amount: 100 * 10 ** 6,
             shopper: alice,
             privateCredentials: credentials
@@ -348,8 +350,7 @@ contract TreasuryTest is BaseTest {
             "POST", // Wrong method
             listing.url,
             EXPECTED_QUERIES_HASH,
-            credentials,
-            Treasury.ShippingState.DELIVERED
+            credentials
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
@@ -371,7 +372,8 @@ contract TreasuryTest is BaseTest {
             })
         );
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-7890123-4567890",
+            url: "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227640.json",
+            productId: "15334575571313",
             amount: 100 * 10 ** 6,
             shopper: alice,
             privateCredentials: credentials
@@ -387,10 +389,9 @@ contract TreasuryTest is BaseTest {
         bytes memory purchaseData = abi.encode(
             EXPECTED_NOTARY_FINGERPRINT,
             "GET",
-            "https://www.amazon.com/gp/your-account/order-details/?orderID=999-9999999-9999999", // Wrong order ID
+            "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/99999999999999.json", // Wrong order ID
             EXPECTED_QUERIES_HASH,
-            credentials,
-            Treasury.ShippingState.DELIVERED
+            credentials
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
@@ -412,7 +413,8 @@ contract TreasuryTest is BaseTest {
             })
         );
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-8901234-5678901",
+            url: "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227641.json",
+            productId: "15334575571313",
             amount: 100 * 10 ** 6,
             shopper: alice,
             privateCredentials: credentials
@@ -430,8 +432,7 @@ contract TreasuryTest is BaseTest {
             "GET",
             listing.url,
             EXPECTED_QUERIES_HASH,
-            credentials,
-            Treasury.ShippingState.DELIVERED
+            credentials
         );
         // Using fake seal - real verifier will reject it
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
@@ -450,7 +451,7 @@ contract TreasuryTest is BaseTest {
 
         uint256 listingAmount = 100 * 10 ** 6;
 
-        // Step 1: Alice creates listing for Amazon shoes
+        // Step 1: Alice creates listing for Shopify order
         bytes32 credentials = treasury.createPrivateCredentials(
             Treasury.PrivateCredentialsRaw({
                 fullName: "Alice Smith",
@@ -462,7 +463,8 @@ contract TreasuryTest is BaseTest {
             })
         );
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-1111111-1111111",
+            url: "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227642.json",
+            productId: "15334575571313",
             amount: listingAmount,
             shopper: alice,
             privateCredentials: credentials
@@ -486,8 +488,7 @@ contract TreasuryTest is BaseTest {
             "GET",
             listing.url,
             EXPECTED_QUERIES_HASH,
-            credentials,
-            Treasury.ShippingState.DELIVERED
+            credentials
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
@@ -733,7 +734,8 @@ contract TreasuryTest is BaseTest {
             })
         );
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-1111111-1111111",
+            url: "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227642.json",
+            productId: "15334575571313",
             amount: listingAmount,
             shopper: alice,
             privateCredentials: credentials
@@ -791,7 +793,8 @@ contract TreasuryTest is BaseTest {
             })
         );
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-2222222-2222222",
+            url: "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227643.json",
+            productId: "15334575571313",
             amount: listingAmount,
             shopper: alice,
             privateCredentials: credentials
@@ -810,8 +813,7 @@ contract TreasuryTest is BaseTest {
             "GET",
             listing.url,
             EXPECTED_QUERIES_HASH,
-            credentials,
-            Treasury.ShippingState.DELIVERED
+            credentials
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
         
@@ -878,14 +880,16 @@ contract TreasuryTest is BaseTest {
             })
         );
         Treasury.Listing memory listing1 = Treasury.Listing({
-            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-3333333-3333333",
+            url: "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227644.json",
+            productId: "15334575571313",
             amount: listing1Amount,
             shopper: alice,
             privateCredentials: credentials
         });
 
         Treasury.Listing memory listing2 = Treasury.Listing({
-            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-4444444-4444444",
+            url: "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227645.json",
+            productId: "15334575571313",
             amount: listing2Amount,
             shopper: alice,
             privateCredentials: credentials
@@ -936,8 +940,7 @@ contract TreasuryTest is BaseTest {
             "GET",
             listing1.url,
             EXPECTED_QUERIES_HASH,
-            credentials,
-            Treasury.ShippingState.DELIVERED
+            credentials
         );
         bytes memory seal1 = abi.encodePacked(bytes32(uint256(1)));
         
@@ -969,7 +972,8 @@ contract TreasuryTest is BaseTest {
             })
         );
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-5555555-5555555",
+            url: "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227646.json",
+            productId: "15334575571313",
             amount: aliceBalanceBefore,
             shopper: alice,
             privateCredentials: credentials
@@ -1016,9 +1020,9 @@ contract TreasuryTest is BaseTest {
         );
     }
 
-    // ============ Amazon URL Format Tests ============
+    // ============ Shopify URL Format Tests ============
 
-    function test_AmazonOrderDetailsUrlFormat() public {
+    function test_ShopifyOrderDetailsUrlFormat() public {
         uint256 listingAmount = 100 * 10 ** 6;
         bytes32 credentials = treasury.createPrivateCredentials(
             Treasury.PrivateCredentialsRaw({
@@ -1031,7 +1035,8 @@ contract TreasuryTest is BaseTest {
             })
         );
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-1234567-8901234",
+            url: "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227633.json",
+            productId: "15334575571313",
             amount: listingAmount,
             shopper: alice,
             privateCredentials: credentials
@@ -1049,8 +1054,7 @@ contract TreasuryTest is BaseTest {
             "GET",
             listing.url,
             EXPECTED_QUERIES_HASH,
-            credentials,
-            Treasury.ShippingState.DELIVERED
+            credentials
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
@@ -1067,7 +1071,7 @@ contract TreasuryTest is BaseTest {
         // assertEq(evvm.getBalance(merchant, address(usdc)), merchantBalanceBefore + listingAmount);
     }
 
-    function test_AmazonPrintUrlFormat() public {
+    function test_ShopifyAlternateOrderUrlFormat() public {
         uint256 listingAmount = 100 * 10 ** 6;
         bytes32 credentials = treasury.createPrivateCredentials(
             Treasury.PrivateCredentialsRaw({
@@ -1080,7 +1084,8 @@ contract TreasuryTest is BaseTest {
             })
         );
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://www.amazon.com/gp/css/summary/print.html?orderID=111-9876543-2109876",
+            url: "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227647.json",
+            productId: "15334575571313",
             amount: listingAmount,
             shopper: alice,
             privateCredentials: credentials
@@ -1098,8 +1103,7 @@ contract TreasuryTest is BaseTest {
             "GET",
             listing.url,
             EXPECTED_QUERIES_HASH,
-            credentials,
-            Treasury.ShippingState.DELIVERED
+            credentials
         );
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
@@ -1130,14 +1134,16 @@ contract TreasuryTest is BaseTest {
             })
         );
         Treasury.Listing memory listing1 = Treasury.Listing({
-            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-9012345-6789012",
+            url: "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227648.json",
+            productId: "15334575571313",
             amount: 50 * 10 ** 6,
             shopper: alice,
             privateCredentials: credentials
         });
 
         Treasury.Listing memory listing2 = Treasury.Listing({
-            url: "https://www.amazon.com/gp/css/summary/print.html?orderID=111-0123456-7890123",
+            url: "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227649.json",
+            productId: "15334575571313",
             amount: 75 * 10 ** 6,
             shopper: alice,
             privateCredentials: credentials
@@ -1153,8 +1159,8 @@ contract TreasuryTest is BaseTest {
         bytes32 id2 = treasury.calculateId(listing2);
 
         // Verify both listings exist
-        (, uint256 amount1, address shopper1, ) = treasury.fetchListing(id1);
-        (, uint256 amount2, address shopper2, ) = treasury.fetchListing(id2);
+        (, , uint256 amount1, address shopper1, ) = treasury.fetchListing(id1);
+        (, , uint256 amount2, address shopper2, ) = treasury.fetchListing(id2);
 
         assertEq(amount1, listing1.amount);
         assertEq(shopper1, alice);
@@ -1176,7 +1182,8 @@ contract TreasuryTest is BaseTest {
             })
         );
         Treasury.Listing memory listing = Treasury.Listing({
-            url: "https://www.amazon.com/gp/your-account/order-details/?orderID=111-1111111-1111111",
+            url: "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227642.json",
+            productId: "15334575571313",
             amount: amount,
             shopper: alice,
             privateCredentials: credentials
@@ -1188,7 +1195,7 @@ contract TreasuryTest is BaseTest {
         vm.stopPrank();
 
         bytes32 listingId = treasury.calculateId(listing);
-        (, uint256 storedAmount, address storedShopper, ) = treasury.fetchListing(listingId);
+        (, , uint256 storedAmount, address storedShopper, ) = treasury.fetchListing(listingId);
 
         assertEq(storedAmount, amount);
         assertEq(storedShopper, alice);
