@@ -22,6 +22,58 @@ PayPunk enables **true** crypto-to-physical-goods transactions through a trustle
 
 ## How It Works 🎯
 
+```mermaid
+flowchart TB
+    subgraph SourceChain["Source Chain (Y Chains)"]
+        User1["👤 User A<br/>Depositor"]
+        Tokens["X Tokens<br/>(ETH, WBTC, etc.)"]
+        DEX["DEX Aggregator"]
+        USDC1["USDC"]
+        Bridge["EIL Bridge"]
+    end
+
+    subgraph TargetChain["Target Chain"]
+        Bridge2["EIL Receiver"]
+        Treasury["📜 Treasury<br/>Smart Contract"]
+        ListItems["List Item Requests"]
+    end
+
+    subgraph Shopify["Shopify Integration"]
+        User2["👤 User B<br/>Purchaser"]
+        Store["🛒 Shopify Store"]
+        Purchase["Purchase Event"]
+    end
+
+    subgraph ZKLayer["ZK Proof Layer"]
+        VLayer["vlayer<br/>ZK Prover"]
+        Proof["ZK Proof"]
+    end
+
+    %% Deposit Flow
+    User1 -->|"1. Deposits"| Tokens
+    Tokens -->|"2. Swap"| DEX
+    DEX -->|"3. Receive"| USDC1
+    USDC1 -->|"4. Bridge via EIL"| Bridge
+    Bridge -->|"5. Receive Voucher"| Bridge2
+    Bridge2 -->|"6. Add Action"| Treasury
+    Treasury -->|"7. Create"| ListItems
+
+    %% Purchase & Proof Flow
+    User2 -->|"8. Browse & Buy"| Store
+    Store -->|"9. Confirm"| Purchase
+    Purchase -->|"10. Generate"| VLayer
+    VLayer -->|"11. Create"| Proof
+    Proof -->|"12. Submit & Verify"| Treasury
+
+    %% Styling
+    style User1 fill:#4CAF50,color:#fff
+    style User2 fill:#2196F3,color:#fff
+    style Treasury fill:#FF9800,color:#fff
+    style VLayer fill:#9C27B0,color:#fff
+    style Bridge fill:#00BCD4,color:#fff
+    style Bridge2 fill:#00BCD4,color:#fff
+```
+
 ### 1. **Create a Listing** 📝✨
 Users upload a listing and specify:
 - 🛍️ What they want to buy (from Shopify)
