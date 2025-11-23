@@ -18,11 +18,11 @@ contract TransferWithAuthorization is Script {
         address from = vm.envAddress("FROM_ADDRESS");
         address to = vm.envAddress("TO_ADDRESS");
         uint256 value = vm.envUint("TRANSFER_VALUE");
-        
+
         // Get validity window (defaults to 1 hour window)
         uint256 validAfter = vm.envOr("VALID_AFTER", block.timestamp - 1);
         uint256 validBefore = vm.envOr("VALID_BEFORE", block.timestamp + 1 hours);
-        
+
         // Get nonce (must be unique)
         bytes32 nonce = vm.envBytes32("NONCE");
         require(nonce != bytes32(0), "NONCE not set");
@@ -45,32 +45,14 @@ contract TransferWithAuthorization is Script {
         console2.logBytes32(nonce);
 
         // Sign the authorization
-        (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
-            treasury,
-            privateKey,
-            from,
-            to,
-            value,
-            validAfter,
-            validBefore,
-            nonce
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            signTransferAuthorization(treasury, privateKey, from, to, value, validAfter, validBefore, nonce);
 
         console2.log("Signature generated");
 
         // Execute the transfer
         vm.startBroadcast();
-        treasury.transferWithAuthorization(
-            from,
-            to,
-            value,
-            validAfter,
-            validBefore,
-            nonce,
-            v,
-            r,
-            s
-        );
+        treasury.transferWithAuthorization(from, to, value, validAfter, validBefore, nonce, v, r, s);
         vm.stopBroadcast();
 
         console2.log("Transfer with authorization executed successfully!");
@@ -102,24 +84,12 @@ contract TransferWithAuthorization is Script {
             "TransferWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)"
         );
 
-        bytes32 structHash = keccak256(
-            abi.encode(
-                TRANSFER_WITH_AUTHORIZATION_TYPEHASH,
-                from,
-                to,
-                value,
-                validAfter,
-                validBefore,
-                nonce
-            )
-        );
+        bytes32 structHash =
+            keccak256(abi.encode(TRANSFER_WITH_AUTHORIZATION_TYPEHASH, from, to, value, validAfter, validBefore, nonce));
 
         bytes32 domainSeparator = treasury.DOMAIN_SEPARATOR();
-        bytes32 digest = keccak256(
-            abi.encodePacked("\x19\x01", domainSeparator, structHash)
-        );
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
 
         (v, r, s) = vm.sign(privateKey, digest);
     }
 }
-

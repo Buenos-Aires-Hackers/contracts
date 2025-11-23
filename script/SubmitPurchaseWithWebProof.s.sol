@@ -105,10 +105,8 @@ contract SubmitPurchaseWithWebProof is Script {
 
         // Define extraction queries for the web proof
         // For Shopify API, extract fulfillment_status only
-        string memory extractionQueries = vm.envOr(
-            "EXTRACTION_QUERIES",
-            string('{"response.body": {"jmespath": ["order.fulfillment_status"]}}')
-        );
+        string memory extractionQueries =
+            vm.envOr("EXTRACTION_QUERIES", string('{"response.body": {"jmespath": ["order.fulfillment_status"]}}'));
 
         console2.log("Compressing web proof...");
         console2.log("  Web proof path:", webProofPath);
@@ -155,11 +153,8 @@ contract SubmitPurchaseWithWebProof is Script {
         console2.log("  Expected Queries Hash:");
         console2.logBytes32(expectedQueriesHash);
 
-        require(
-            journalData.notaryKeyFingerprint == expectedNotaryFingerprint,
-            "Notary fingerprint mismatch"
-        );
-        
+        require(journalData.notaryKeyFingerprint == expectedNotaryFingerprint, "Notary fingerprint mismatch");
+
         // Provide detailed error message for queries hash mismatch
         if (journalData.queriesHash != expectedQueriesHash) {
             console2.log("\nERROR: Queries hash mismatch!");
@@ -245,19 +240,13 @@ contract SubmitPurchaseWithWebProof is Script {
     }
 
     /// @notice Save purchase data to JSON file
-    function _savePurchaseData(
-        ListingData memory listingData,
-        JournalData memory journalData,
-        address merchant
-    ) internal {
+    function _savePurchaseData(ListingData memory listingData, JournalData memory journalData, address merchant)
+        internal
+    {
         // Generate unique filename for this purchase
         uint256 timestamp = block.timestamp;
-        string memory purchaseFileName = string.concat(
-            "purchase_",
-            vm.toString(timestamp),
-            "_",
-            vm.toString(listingData.listingId)
-        );
+        string memory purchaseFileName =
+            string.concat("purchase_", vm.toString(timestamp), "_", vm.toString(listingData.listingId));
         PURCHASE_FILE = string.concat(PURCHASES_PATH, purchaseFileName, ".json");
 
         // Create JSON object with purchase data using vm.serialize*
@@ -285,10 +274,10 @@ contract SubmitPurchaseWithWebProof is Script {
     /// @param webProofPath Path to the web proof JSON file
     /// @param extractionQueries JSON string of extraction queries
     /// @return VlayerResponse containing zkProof and journalDataAbi
-    function compressWebProof(
-        string memory webProofPath,
-        string memory extractionQueries
-    ) internal returns (VlayerResponse memory) {
+    function compressWebProof(string memory webProofPath, string memory extractionQueries)
+        internal
+        returns (VlayerResponse memory)
+    {
         // Prepare FFI command
         string[] memory inputs = new string[](3);
         inputs[0] = "bash";
@@ -317,10 +306,7 @@ contract SubmitPurchaseWithWebProof is Script {
         bytes memory zkProof = vm.parseJsonBytes(resultStr, ".zkProof");
         bytes memory journalDataAbi = vm.parseJsonBytes(resultStr, ".journalDataAbi");
 
-        return VlayerResponse({
-            zkProof: zkProof,
-            journalDataAbi: journalDataAbi
-        });
+        return VlayerResponse({zkProof: zkProof, journalDataAbi: journalDataAbi});
     }
 
     /// @notice Check if a string starts with a prefix
@@ -330,17 +316,17 @@ contract SubmitPurchaseWithWebProof is Script {
     function _startsWith(string memory str, string memory prefix) internal pure returns (bool) {
         bytes memory strBytes = bytes(str);
         bytes memory prefixBytes = bytes(prefix);
-        
+
         if (strBytes.length < prefixBytes.length) {
             return false;
         }
-        
+
         for (uint256 i = 0; i < prefixBytes.length; i++) {
             if (strBytes[i] != prefixBytes[i]) {
                 return false;
             }
         }
-        
+
         return true;
     }
 

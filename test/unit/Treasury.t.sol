@@ -131,7 +131,8 @@ contract TreasuryTest is BaseTest {
 
         // Verify listing was stored
         bytes32 listingId = treasury.calculateId(listing);
-        (string memory url, string memory productId, uint256 amount, address shopper, bytes32 privateCredentials) = treasury.fetchListing(listingId);
+        (string memory url, string memory productId, uint256 amount, address shopper, bytes32 privateCredentials) =
+            treasury.fetchListing(listingId);
         assertEq(url, listing.url);
         assertEq(amount, listing.amount);
         assertEq(shopper, listing.shopper);
@@ -194,13 +195,8 @@ contract TreasuryTest is BaseTest {
         bytes32 listingId = treasury.calculateId(listing);
 
         // Step 2: Prepare purchase data
-        bytes memory purchaseData = abi.encode(
-            EXPECTED_NOTARY_FINGERPRINT,
-            "GET",
-            listing.url,
-            EXPECTED_QUERIES_HASH,
-            credentials
-        );
+        bytes memory purchaseData =
+            abi.encode(EXPECTED_NOTARY_FINGERPRINT, "GET", listing.url, EXPECTED_QUERIES_HASH, credentials);
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
         // Step 3: Submit purchase
@@ -427,13 +423,8 @@ contract TreasuryTest is BaseTest {
 
         bytes32 listingId = treasury.calculateId(listing);
 
-        bytes memory purchaseData = abi.encode(
-            EXPECTED_NOTARY_FINGERPRINT,
-            "GET",
-            listing.url,
-            EXPECTED_QUERIES_HASH,
-            credentials
-        );
+        bytes memory purchaseData =
+            abi.encode(EXPECTED_NOTARY_FINGERPRINT, "GET", listing.url, EXPECTED_QUERIES_HASH, credentials);
         // Using fake seal - real verifier will reject it
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
@@ -483,13 +474,8 @@ contract TreasuryTest is BaseTest {
 
         // Step 2-4: Bob buys with credit card, gets receipt, webapp creates ZK proof,
         // Bob submits proof → Alice's evvm balance transfers to Bob's evvm balance
-        bytes memory purchaseData = abi.encode(
-            EXPECTED_NOTARY_FINGERPRINT,
-            "GET",
-            listing.url,
-            EXPECTED_QUERIES_HASH,
-            credentials
-        );
+        bytes memory purchaseData =
+            abi.encode(EXPECTED_NOTARY_FINGERPRINT, "GET", listing.url, EXPECTED_QUERIES_HASH, credentials);
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
         // NOTE: With real RISC Zero verifier, fake seals will be rejected
@@ -535,32 +521,15 @@ contract TreasuryTest is BaseTest {
         uint256 bobWalletBalanceBefore = usdc.balanceOf(bob);
 
         // Backend signs the authorization for Bob to withdraw
-        (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
-            backendPrivateKey,
-            backend,
-            bob,
-            transferAmount,
-            validAfter,
-            validBefore,
-            nonce
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            signTransferAuthorization(backendPrivateKey, backend, bob, transferAmount, validAfter, validBefore, nonce);
 
         // Expect ERC-3009 AuthorizationUsed event
         vm.expectEmit(true, true, false, false);
         emit Treasury.AuthorizationUsed(backend, nonce);
 
         // x402 submits the backend-signed authorization
-        treasury.transferWithAuthorization(
-            backend,
-            bob,
-            transferAmount,
-            validAfter,
-            validBefore,
-            nonce,
-            v,
-            r,
-            s
-        );
+        treasury.transferWithAuthorization(backend, bob, transferAmount, validAfter, validBefore, nonce, v, r, s);
 
         // Bob's evvm balance should decrease
         assertEq(evvm.getBalance(bob, address(usdc)), bobEvvmBalanceBefore - transferAmount);
@@ -575,28 +544,11 @@ contract TreasuryTest is BaseTest {
         bytes32 nonce = keccak256("unique-nonce-2");
 
         // Alice signs instead of backend (wrong signer)
-        (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
-            alicePrivateKey,
-            backend,
-            bob,
-            transferAmount,
-            validAfter,
-            validBefore,
-            nonce
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            signTransferAuthorization(alicePrivateKey, backend, bob, transferAmount, validAfter, validBefore, nonce);
 
         vm.expectRevert(Treasury.InvalidSignature.selector);
-        treasury.transferWithAuthorization(
-            backend,
-            bob,
-            transferAmount,
-            validAfter,
-            validBefore,
-            nonce,
-            v,
-            r,
-            s
-        );
+        treasury.transferWithAuthorization(backend, bob, transferAmount, validAfter, validBefore, nonce, v, r, s);
     }
 
     function test_TransferWithAuthorization_ReplayProtection() public {
@@ -614,42 +566,15 @@ contract TreasuryTest is BaseTest {
         usdc.transfer(address(treasury), transferAmount * 2);
 
         // Backend signs the authorization
-        (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
-            backendPrivateKey,
-            backend,
-            bob,
-            transferAmount,
-            validAfter,
-            validBefore,
-            nonce
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            signTransferAuthorization(backendPrivateKey, backend, bob, transferAmount, validAfter, validBefore, nonce);
 
         // First call succeeds
-        treasury.transferWithAuthorization(
-            backend,
-            bob,
-            transferAmount,
-            validAfter,
-            validBefore,
-            nonce,
-            v,
-            r,
-            s
-        );
+        treasury.transferWithAuthorization(backend, bob, transferAmount, validAfter, validBefore, nonce, v, r, s);
 
         // Second call with same signature should fail (nonce already used)
         vm.expectRevert(Treasury.AuthorizationAlreadyUsed.selector);
-        treasury.transferWithAuthorization(
-            backend,
-            bob,
-            transferAmount,
-            validAfter,
-            validBefore,
-            nonce,
-            v,
-            r,
-            s
-        );
+        treasury.transferWithAuthorization(backend, bob, transferAmount, validAfter, validBefore, nonce, v, r, s);
     }
 
     function test_TransferWithAuthorization_Expired_Before() public {
@@ -658,28 +583,11 @@ contract TreasuryTest is BaseTest {
         uint256 validBefore = block.timestamp + 1 hours;
         bytes32 nonce = keccak256("unique-nonce-4");
 
-        (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
-            backendPrivateKey,
-            backend,
-            bob,
-            transferAmount,
-            validAfter,
-            validBefore,
-            nonce
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            signTransferAuthorization(backendPrivateKey, backend, bob, transferAmount, validAfter, validBefore, nonce);
 
         vm.expectRevert(Treasury.Expired.selector);
-        treasury.transferWithAuthorization(
-            backend,
-            bob,
-            transferAmount,
-            validAfter,
-            validBefore,
-            nonce,
-            v,
-            r,
-            s
-        );
+        treasury.transferWithAuthorization(backend, bob, transferAmount, validAfter, validBefore, nonce, v, r, s);
     }
 
     function test_TransferWithAuthorization_Expired_After() public {
@@ -688,30 +596,13 @@ contract TreasuryTest is BaseTest {
         uint256 validBefore = 200;
         bytes32 nonce = keccak256("unique-nonce-5");
 
-        (uint8 v, bytes32 r, bytes32 s) = signTransferAuthorization(
-            backendPrivateKey,
-            backend,
-            bob,
-            transferAmount,
-            validAfter,
-            validBefore,
-            nonce
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            signTransferAuthorization(backendPrivateKey, backend, bob, transferAmount, validAfter, validBefore, nonce);
 
         vm.warp(300);
 
         vm.expectRevert(Treasury.Expired.selector);
-        treasury.transferWithAuthorization(
-            backend,
-            bob,
-            transferAmount,
-            validAfter,
-            validBefore,
-            nonce,
-            v,
-            r,
-            s
-        );
+        treasury.transferWithAuthorization(backend, bob, transferAmount, validAfter, validBefore, nonce, v, r, s);
     }
 
     // ============ Locking Mechanism Tests ============
@@ -808,24 +699,19 @@ contract TreasuryTest is BaseTest {
         bytes32 listingId = treasury.calculateId(listing);
 
         // Bob completes the purchase
-        bytes memory purchaseData = abi.encode(
-            EXPECTED_NOTARY_FINGERPRINT,
-            "GET",
-            listing.url,
-            EXPECTED_QUERIES_HASH,
-            credentials
-        );
+        bytes memory purchaseData =
+            abi.encode(EXPECTED_NOTARY_FINGERPRINT, "GET", listing.url, EXPECTED_QUERIES_HASH, credentials);
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
-        
+
         // NOTE: With real RISC Zero verifier, fake seals will be rejected
         // Replace 'seal' with a real proof seal to test successful verification
         vm.prank(bob);
         vm.expectRevert(Treasury.ZKProofVerificationFailed.selector);
         treasury.submitPurchase(listingId, purchaseData, seal);
-        
+
         // When using a real seal, remove the expectRevert above and uncomment below:
         // assertEq(evvm.getBalance(alice, address(usdc)), aliceBalanceBefore - listingAmount);
-        
+
         // After purchase, Alice's locked amount should be 0
         // Alice's remaining balance should be withdrawable
         uint256 aliceRemainingBalance = evvm.getBalance(alice, address(usdc));
@@ -935,21 +821,16 @@ contract TreasuryTest is BaseTest {
 
         // Complete first listing
         bytes32 listing1Id = treasury.calculateId(listing1);
-        bytes memory purchaseData1 = abi.encode(
-            EXPECTED_NOTARY_FINGERPRINT,
-            "GET",
-            listing1.url,
-            EXPECTED_QUERIES_HASH,
-            credentials
-        );
+        bytes memory purchaseData1 =
+            abi.encode(EXPECTED_NOTARY_FINGERPRINT, "GET", listing1.url, EXPECTED_QUERIES_HASH, credentials);
         bytes memory seal1 = abi.encodePacked(bytes32(uint256(1)));
-        
+
         // NOTE: With real RISC Zero verifier, fake seals will be rejected
         // Replace 'seal1' with a real proof seal to test successful verification
         vm.prank(bob);
         vm.expectRevert(Treasury.ZKProofVerificationFailed.selector);
         treasury.submitPurchase(listing1Id, purchaseData1, seal1);
-        
+
         // When using a real seal, remove the expectRevert above
 
         // After completing first listing, Alice has listing2Amount locked
@@ -1049,13 +930,8 @@ contract TreasuryTest is BaseTest {
 
         bytes32 listingId = treasury.calculateId(listing);
 
-        bytes memory purchaseData = abi.encode(
-            EXPECTED_NOTARY_FINGERPRINT,
-            "GET",
-            listing.url,
-            EXPECTED_QUERIES_HASH,
-            credentials
-        );
+        bytes memory purchaseData =
+            abi.encode(EXPECTED_NOTARY_FINGERPRINT, "GET", listing.url, EXPECTED_QUERIES_HASH, credentials);
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
         // NOTE: With real RISC Zero verifier, fake seals will be rejected
@@ -1098,13 +974,8 @@ contract TreasuryTest is BaseTest {
 
         bytes32 listingId = treasury.calculateId(listing);
 
-        bytes memory purchaseData = abi.encode(
-            EXPECTED_NOTARY_FINGERPRINT,
-            "GET",
-            listing.url,
-            EXPECTED_QUERIES_HASH,
-            credentials
-        );
+        bytes memory purchaseData =
+            abi.encode(EXPECTED_NOTARY_FINGERPRINT, "GET", listing.url, EXPECTED_QUERIES_HASH, credentials);
         bytes memory seal = abi.encodePacked(bytes32(uint256(1)));
 
         // NOTE: With real RISC Zero verifier, fake seals will be rejected
@@ -1159,8 +1030,8 @@ contract TreasuryTest is BaseTest {
         bytes32 id2 = treasury.calculateId(listing2);
 
         // Verify both listings exist
-        (, , uint256 amount1, address shopper1, ) = treasury.fetchListing(id1);
-        (, , uint256 amount2, address shopper2, ) = treasury.fetchListing(id2);
+        (,, uint256 amount1, address shopper1,) = treasury.fetchListing(id1);
+        (,, uint256 amount2, address shopper2,) = treasury.fetchListing(id2);
 
         assertEq(amount1, listing1.amount);
         assertEq(shopper1, alice);
@@ -1195,7 +1066,7 @@ contract TreasuryTest is BaseTest {
         vm.stopPrank();
 
         bytes32 listingId = treasury.calculateId(listing);
-        (, , uint256 storedAmount, address storedShopper, ) = treasury.fetchListing(listingId);
+        (,, uint256 storedAmount, address storedShopper,) = treasury.fetchListing(listingId);
 
         assertEq(storedAmount, amount);
         assertEq(storedShopper, alice);

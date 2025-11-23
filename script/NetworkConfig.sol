@@ -36,4 +36,3 @@ library NetworkConfig {
         return chainId == BASE_SEPOLIA_CHAIN_ID;
     }
 }
-

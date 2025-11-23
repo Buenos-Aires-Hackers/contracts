@@ -59,8 +59,7 @@ contract DeployTestnet is Script {
     function run() public {
         // Verify we're on Base Sepolia
         require(
-            NetworkConfig.isBaseSepolia(block.chainid),
-            "DeployTestnet: Must deploy to Base Sepolia (chain ID 84532)"
+            NetworkConfig.isBaseSepolia(block.chainid), "DeployTestnet: Must deploy to Base Sepolia (chain ID 84532)"
         );
 
         string memory path = "input/address.json";
@@ -142,14 +141,7 @@ contract DeployTestnet is Script {
         estimator = new Estimator(addressData.activator, address(evvm), address(staking), addressData.admin);
         nameService = new NameService(address(evvm), addressData.admin);
 
-        treasury = new Treasury(
-            address(evvm),
-            risc0Verifier,
-            imageId,
-            notaryKeyFingerprint,
-            queriesHash,
-            paymentToken
-        );
+        treasury = new Treasury(address(evvm), risc0Verifier, imageId, notaryKeyFingerprint, queriesHash, paymentToken);
 
         staking._setupEstimatorAndEvvm(address(estimator), address(evvm));
         evvm._setupNameServiceAndTreasuryAddress(address(nameService), address(treasury));
