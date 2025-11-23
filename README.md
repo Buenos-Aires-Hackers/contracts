@@ -29,13 +29,13 @@ Users upload a listing and specify:
 - 🔐 Their private delivery credentials (encrypted, obviously)
 
 ### 2. **Lock Funds** 🔒💎
-Once a listing is created, the user's USDC gets deposited and locked into our **EVVM** (Ethereum Virtual Machine Virtual Machine) contract. The funds stay locked in escrow until the purchase is verified - no funny business. 🎪
+Once a listing is created, the user's USDC gets deposited and locked into our **[EVVM](https://www.evvm.org/)** (Ethereum Virtual Machine Virtual Machine) contract. The funds stay locked in escrow until the purchase is verified - no funny business. 🎪
 
 ### 3. **Browse & Purchase** 🛒🎁
 Anyone can browse available listings and decide to fulfill a purchase. The buyer uses their own payment method (credit card, debit card, or whatever works) to purchase the item from Shopify and have it delivered to the original requester. Simple as that. 🎉
 
 ### 4. **Prove Purchase & Delivery** ✅🔍
-After completing the purchase and ensuring delivery, the buyer uploads a **zero-knowledge proof** generated from **vlayer** that cryptographically verifies:
+After completing the purchase and ensuring delivery, the buyer uploads a **zero-knowledge proof** generated from **[vlayer](https://www.vlayer.xyz/)** that cryptographically verifies:
 - ✅ The purchase was made
 - 📦 The item was delivered to the correct recipient
 
@@ -49,7 +49,7 @@ When funds are unlocked, a background bot catches this event and automatically p
 
 ## Cross-Chain Support 🌉🌍
 
-PayPunk meets users where they're at. Users can create listings from **any chain** using **any token**. Through the **Ethereum Interoperability Layer (EIL)**, PayPunk automatically:
+PayPunk meets users where they're at. Users can create listings from **any chain** using **any token**. Through the **[Ethereum Interoperability Layer (EIL)](https://blog.ethereum.org/2025/11/18/eil)**, PayPunk automatically:
 - 🔄 Swaps tokens to the required payment token
 - 🌉 Bridges assets across chains
 - 📋 Lists your request seamlessly
@@ -60,23 +60,23 @@ No more being locked into one chain or one token. Freedom, baby! 🗽
 
 ### Core Technologies 🔧
 
-- **EVVM (Ethereum Virtual Machine Virtual Machine)** 🎪: Our secure escrow contract for locking and managing funds. We've built a custom EVVM service that handles the entire escrow lifecycle, from deposit to withdrawal, with async nonce support for efficient transaction processing. It's like a blockchain within a blockchain. Mind-blowing stuff. 🧠
-- **vlayer** 🔐: Zero-knowledge proof generation and verification for purchase and delivery confirmation. We use vlayer's Web Prover Server to generate ZK proofs that verify purchase and delivery without revealing sensitive information. Privacy-preserving verification at its finest. 🎭
+- **[EVVM](https://www.evvm.org/) (Ethereum Virtual Machine Virtual Machine)** 🎪: Our secure escrow contract for locking and managing funds. We've built a custom EVVM service that handles the entire escrow lifecycle, from deposit to withdrawal, with async nonce support for efficient transaction processing. It's like a blockchain within a blockchain. Mind-blowing stuff. 🧠
+- **[vlayer](https://www.vlayer.xyz/)** 🔐: Zero-knowledge proof generation and verification for purchase and delivery confirmation. We use vlayer's Web Prover Server to generate ZK proofs that verify purchase and delivery without revealing sensitive information. Privacy-preserving verification at its finest. 🎭
 - **x402** 🤖: Automated token payout system for seamless transfers when funds are unlocked. Set it and forget it. 🚀
-- **EIL (Ethereum Interoperability Layer)** 🌉: Cross-chain token swaps and bridging infrastructure, enabling users to list from any chain with any token. Chain abstraction done right. 🎯
+- **[EIL (Ethereum Interoperability Layer)](https://blog.ethereum.org/2025/11/18/eil)** 🌉: Cross-chain token swaps and bridging infrastructure, enabling users to list from any chain with any token. Chain abstraction done right. 🎯
 
 ### Smart Contracts 📜
 
 - **Treasury.sol** 💼: The main contract handling deposits, withdrawals, listing creation, and purchase verification. It's the brain of the operation. 🧠
-- **EVVM Integration** 🎪: Custom EVVM service built on the MATE Metaprotocol for secure, scalable fund management. Virtual blockchain magic. ✨
-- **RISC Zero Verification** 🔍: ZK proof verification using RISC Zero verifier contracts. Trust, but verify. 🛡️
+- **[EVVM](https://www.evvm.org/) Integration** 🎪: Custom EVVM service built on the MATE Metaprotocol for secure, scalable fund management. Virtual blockchain magic. ✨
+- **RISC Zero & [vlayer](https://www.vlayer.xyz/) Verification** 🔍: ZK proof verification using RISC Zero verifier contracts combined with vlayer's Web Prover Server. We use vlayer to generate the proofs and RISC Zero to verify them on-chain. Trust, but verify - with style! 🛡️✨
 
 ## Features 🎨
 
 - 🔐 **Trustless Escrow**: Funds are locked in a smart contract until delivery is proven. No trust needed. 🎯
 - 🔒 **Privacy-Preserving**: Private credentials are encrypted and only revealed when necessary. Your data, your control. 🛡️
 - ✅ **ZK-Proof Verification**: Cryptographic proof of purchase and delivery without revealing sensitive details. Math that protects you. 🔢
-- 🌉 **Multi-Chain Support**: List from any chain, pay with any token via EIL. Chain-agnostic freedom. 🌍
+- 🌉 **Multi-Chain Support**: List from any chain, pay with any token via [EIL](https://blog.ethereum.org/2025/11/18/eil). Chain-agnostic freedom. 🌍
 - 🤖 **Automated Payouts**: Background bot handles token transfers seamlessly via x402. Automation that works. ⚡
 - 💳 **Payment Flexibility**: Buyers can use any payment method (cards, crypto, etc.). Options, options, options. 🎁
 
@@ -99,10 +99,10 @@ User (Chain A, Token X) → EIL Swap & Bridge → USDC on Target Chain → Listi
 
 ## Bounties & Grants 🏆🎯
 
-### EVVM - Your Custom Service or EVVM Chain ⚙️🎪
+### [EVVM](https://www.evvm.org/) - Your Custom Service or EVVM Chain ⚙️🎪
 **Track**: Custom Service or EVVM Chain
 
-We've built a **custom EVVM service** on the MATE Metaprotocol that handles the entire escrow lifecycle for PayPunk. Our Treasury contract integrates with EVVM to provide:
+We've built a **custom [EVVM](https://www.evvm.org/) service** on the MATE Metaprotocol that handles the entire escrow lifecycle for PayPunk. Our Treasury contract integrates with EVVM to provide:
 - 🔒 Secure fund locking and unlocking
 - ⚡ Async nonce support for efficient transaction processing
 - 🔗 Integration with the MATE Metaprotocol deployed on Sepolia
@@ -111,21 +111,21 @@ We've built a **custom EVVM service** on the MATE Metaprotocol that handles the 
 - Sepolia EVVM: `0xF817e9ad82B4a19F00dA7A248D9e556Ba96e6366`
 - Treasury Contract: See deployments section below 📍
 
-### vlayer - Best ZK Proving dApp 🧠🔐
+### [vlayer](https://www.vlayer.xyz/) - Best ZK Proving dApp 🧠🔐
 **Track**: Best ZK Proving dApp
 
-PayPunk uses vlayer's Web Prover Server to generate zero-knowledge proofs that verify:
+PayPunk uses [vlayer](https://www.vlayer.xyz/)'s Web Prover Server to generate zero-knowledge proofs that verify:
 - ✅ Purchase confirmation from Shopify
 - 📦 Delivery verification to the correct recipient
 - 🔒 Privacy-preserving verification without exposing sensitive user data
 
 Our implementation uses both the Prover and Verifier smart contracts, with RISC Zero contract deployment for on-chain verification. ZK magic in action! ✨
 
-### Ethereum Foundation - Best use of the EIL SDK 🧱🌉
+### Ethereum Foundation - Best use of the [EIL](https://blog.ethereum.org/2025/11/18/eil) SDK 🧱🌉
 **Track**: Best use of the EIL SDK
 
-PayPunk leverages the EIL SDK to enable **seamless cross-chain token movement**. Users can create listings from any chain using any token, and PayPunk automatically:
-- 🔄 Swaps tokens to USDC using EIL
+PayPunk leverages the [EIL](https://blog.ethereum.org/2025/11/18/eil) SDK to enable **seamless cross-chain token movement**. Users can create listings from any chain using any token, and PayPunk automatically:
+- 🔄 Swaps tokens to USDC using [EIL](https://blog.ethereum.org/2025/11/18/eil)
 - 🌉 Bridges assets across multiple L2 chains
 - 🎨 Provides a seamless UX regardless of the user's chain or token preference
 
@@ -137,9 +137,9 @@ This demonstrates **true chain abstraction**, allowing users to interact with Pa
 
 - 📦 Node.js and npm/yarn
 - 🔨 Foundry (for smart contract development)
-- 🎪 Access to EVVM testnet (MATE Metaprotocol on Sepolia)
-- 🔐 vlayer API access (for ZK proof generation)
-- 🌉 EIL SDK for cross-chain operations
+- 🎪 Access to [EVVM](https://www.evvm.org/) testnet (MATE Metaprotocol on Sepolia)
+- 🔐 [vlayer](https://www.vlayer.xyz/) API access (for ZK proof generation)
+- 🌉 [EIL](https://blog.ethereum.org/2025/11/18/eil) SDK for cross-chain operations
 
 ### Installation 💻
 
@@ -161,29 +161,26 @@ forge test
 ### Deployment 🚀
 
 ```bash
-# Deploy to Base Sepolia testnet
-make deployTestnet NETWORK=base-sepolia
-
-# Or use the deployment script directly
-forge script script/DeployTestnet.s.sol --rpc-url <BASE_SEPOLIA_RPC_URL> --broadcast
+# Deploy to Base Sepolia testnet using EVVM init script
+./evvm-init.sh
 ```
 
-## Contract Addresses 📍
+This script handles the full deployment process including EVVM setup and contract deployment. 🎯
 
 ### Testnet Deployments 🧪
 
 **Base Sepolia** 🎯:
 - 💼 Treasury: See `deployments/84532/` for latest addresses
-- 🎪 EVVM Integration: Using MATE Metaprotocol at `0xF817e9ad82B4a19F00dA7A248D9e556Ba96e6366`
+- 🎪 [EVVM](https://www.evvm.org/) Integration: Using MATE Metaprotocol at `0xF817e9ad82B4a19F00dA7A248D9e556Ba96e6366`
 
 _Mainnet deployment addresses will be added after launch_ 🚀
 
 ## Links and Resources 🔗
 
-- 🎪 **EVVM Telegram Devs Group**: https://t.me/EVVMorg
+- 🎪 **[EVVM](https://www.evvm.org/) Telegram Devs Group**: https://t.me/EVVMorg
 - 💧 **$MATE Sepolia Faucet**: https://evvm.dev
-- 📚 **EIL Documentation**: http://docs.ethereuminteroplayer.com/
-- 🔐 **vlayer Documentation**: [vlayer docs]
+- 📚 **[EIL](https://blog.ethereum.org/2025/11/18/eil) Documentation**: http://docs.ethereuminteroplayer.com/
+- 🔐 **[vlayer](https://www.vlayer.xyz/) Documentation**: https://www.vlayer.xyz/
 
 ## Future Enhancements 🔮
 
@@ -205,7 +202,11 @@ Contributions are welcome! Please feel free to submit a Pull Request. Let's buil
 
 ## Team 👥
 
-Built with ❤️🔥 by the PayPunk team
+Built with ❤️🔥 by the PayPunk team:
+
+- [@NevvDevv](https://x.com/NevvDevv) 🚀
+- [@nhestrompia](https://x.com/nhestrompia) 💻
+- [@0xjsieth](https://x.com/0xjsieth) ⚡
 
 ---
 
