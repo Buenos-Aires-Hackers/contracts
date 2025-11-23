@@ -68,7 +68,7 @@ No more being locked into one chain or one token. Freedom, baby! 🗽
 ### Smart Contracts 📜
 
 - **Treasury.sol** 💼: The main contract handling deposits, withdrawals, listing creation, and purchase verification. It's the brain of the operation. 🧠
-- **[EVVM](https://www.evvm.org/) Integration** 🎪: Custom EVVM service built on the MATE Metaprotocol for secure, scalable fund management. Virtual blockchain magic. ✨
+- **[EVVM](https://www.evvm.org/) Integration** 🎪: Our custom EVVM service for secure, scalable fund management. Virtual blockchain magic. ✨
 - **RISC Zero & [vlayer](https://www.vlayer.xyz/) Verification** 🔍: ZK proof verification using RISC Zero verifier contracts combined with vlayer's Web Prover Server. We use vlayer to generate the proofs and RISC Zero to verify them on-chain. Trust, but verify - with style! 🛡️✨
 
 ## Features 🎨
@@ -102,13 +102,12 @@ User (Chain A, Token X) → EIL Swap & Bridge → USDC on Target Chain → Listi
 ### [EVVM](https://www.evvm.org/) - Your Custom Service or EVVM Chain ⚙️🎪
 **Track**: Custom Service or EVVM Chain
 
-We've built a **custom [EVVM](https://www.evvm.org/) service** on the MATE Metaprotocol that handles the entire escrow lifecycle for PayPunk. Our Treasury contract integrates with EVVM to provide:
+We've built a **custom [EVVM](https://www.evvm.org/) service** that handles the entire escrow lifecycle for PayPunk. Our Treasury contract integrates with our custom EVVM to provide:
 - 🔒 Secure fund locking and unlocking
 - ⚡ Async nonce support for efficient transaction processing
-- 🔗 Integration with the MATE Metaprotocol deployed on Sepolia
+- 🎯 Full control over the escrow mechanism
 
 **Deployment**: 
-- Sepolia EVVM: `0xF817e9ad82B4a19F00dA7A248D9e556Ba96e6366`
 - Treasury Contract: See deployments section below 📍
 
 ### [vlayer](https://www.vlayer.xyz/) - Best ZK Proving dApp 🧠🔐
@@ -137,7 +136,7 @@ This demonstrates **true chain abstraction**, allowing users to interact with Pa
 
 - 📦 Node.js and npm/yarn
 - 🔨 Foundry (for smart contract development)
-- 🎪 Access to [EVVM](https://www.evvm.org/) testnet (MATE Metaprotocol on Sepolia)
+- 🎪 Access to [EVVM](https://www.evvm.org/) for custom EVVM deployment
 - 🔐 [vlayer](https://www.vlayer.xyz/) API access (for ZK proof generation)
 - 🌉 [EIL](https://blog.ethereum.org/2025/11/18/eil) SDK for cross-chain operations
 
@@ -171,16 +170,9 @@ This script handles the full deployment process including EVVM setup and contrac
 
 **Base Sepolia** 🎯:
 - 💼 Treasury: See `deployments/84532/` for latest addresses
-- 🎪 [EVVM](https://www.evvm.org/) Integration: Using MATE Metaprotocol at `0xF817e9ad82B4a19F00dA7A248D9e556Ba96e6366`
+- 🎪 [EVVM](https://www.evvm.org/) Integration: Custom EVVM service deployed for escrow management
 
 _Mainnet deployment addresses will be added after launch_ 🚀
-
-## Links and Resources 🔗
-
-- 🎪 **[EVVM](https://www.evvm.org/) Telegram Devs Group**: https://t.me/EVVMorg
-- 💧 **$MATE Sepolia Faucet**: https://evvm.dev
-- 📚 **[EIL](https://blog.ethereum.org/2025/11/18/eil) Documentation**: http://docs.ethereuminteroplayer.com/
-- 🔐 **[vlayer](https://www.vlayer.xyz/) Documentation**: https://www.vlayer.xyz/
 
 ## Future Enhancements 🔮
 
