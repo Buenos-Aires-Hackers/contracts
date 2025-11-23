@@ -14,7 +14,7 @@ library NetworkConfig {
     /// @notice RISC Zero Verifier Router address on Base Sepolia
     /// @dev This is the recommended verifier to use as it routes to appropriate verifiers
     ///      based on the proof version. See: https://dev.risczero.com/api/blockchain-integration/contracts/verifier
-    address public constant RISC_ZERO_VERIFIER_ROUTER = 0x0b144E07A0826182B6b59788c34b32Bfa86Fb711;
+    address public constant RISC_ZERO_VERIFIER_ROUTER = 0x02E1F6e057832F9EA0C6c078B8aBd0E81E9FD2d1;
 
     /// @notice Base Sepolia RPC URL for forking
     string public constant BASE_SEPOLIA_RPC_URL = "https://sepolia.base.org";
