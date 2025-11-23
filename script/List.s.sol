@@ -70,17 +70,22 @@ contract List is Script {
         Treasury treasury = Treasury(treasuryAddress);
 
         // Get listing parameters - use Shopify API for order fulfillment verification
-        string memory url = vm.envOr("LISTING_URL", string("https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227633.json"));
+        string memory url = vm.envOr(
+            "LISTING_URL",
+            string(
+                "https://test-1111111111111111111111111111111111711111111111125595.myshopify.com/admin/api/2024-01/orders/16447065227633.json"
+            )
+        );
         uint256 amount = vm.envOr("LISTING_AMOUNT", uint256(100000000)); // Default: 100 USDC (6 decimals)
-        
+
         // Shopper should be the broadcaster's address (set by shell script via SHOPPER_ADDRESS env var)
         // This ensures the shopper's private key is available for signing transactions
         address shopper = vm.envOr("SHOPPER_ADDRESS", address(0));
         require(shopper != address(0), "SHOPPER_ADDRESS must be set (should be the broadcaster address)");
-        
+
         // Get private credentials (can be computed from raw credentials or provided directly)
         bytes32 privateCredentials = vm.envOr("PRIVATE_CREDENTIALS", bytes32(0));
-        
+
         // If private credentials not provided, compute from raw credentials
         if (privateCredentials == bytes32(0)) {
             string memory fullName = vm.envOr("FULL_NAME", string("John Doe"));
@@ -89,7 +94,7 @@ contract List is Script {
             string memory city = vm.envOr("CITY", string("New York"));
             string memory country = vm.envOr("COUNTRY", string("USA"));
             string memory zip = vm.envOr("ZIP", string("10001"));
-            
+
             Treasury.PrivateCredentialsRaw memory rawCredentials = Treasury.PrivateCredentialsRaw({
                 fullName: fullName,
                 emailAddress: emailAddress,
@@ -98,7 +103,7 @@ contract List is Script {
                 country: country,
                 zip: zip
             });
-            
+
             privateCredentials = treasury.createPrivateCredentials(rawCredentials);
         }
 
@@ -119,12 +124,7 @@ contract List is Script {
 
         // Generate unique filename for this listing using timestamp and shopper
         uint256 timestamp = block.timestamp;
-        string memory listingFileName = string.concat(
-            "listing_",
-            vm.toString(timestamp),
-            "_",
-            vm.toString(shopper)
-        );
+        string memory listingFileName = string.concat("listing_", vm.toString(timestamp), "_", vm.toString(shopper));
         LISTING_FILE = string.concat(LISTINGS_PATH, listingFileName, ".json");
         CREDENTIALS_FILE = string.concat(LISTINGS_PATH, listingFileName, "_credentials.txt");
 
@@ -137,26 +137,26 @@ contract List is Script {
 
         // Get payment token address
         address paymentToken = treasury.PAYMENT_TOKEN();
-        
+
         // Start broadcast - uses the account from --account flag
         // The shell script ensures SHOPPER_ADDRESS matches the broadcaster address from --account
         // This ensures all transactions (approve, list) are from the shopper address
         vm.startBroadcast();
-        
+
         console2.log("Broadcasting from shopper address:", shopper);
         console2.log("Note: Shopper must match the --account address for transactions to work");
-        
+
         // Handle payment token (mint if needed, then approve)
         if (paymentToken != address(0)) {
             IERC20 token = IERC20(paymentToken);
             uint256 balance = token.balanceOf(shopper);
-            
+
             // Check if we need to mint tokens (for mock tokens)
             if (balance < amount) {
                 uint256 mintAmount = amount - balance;
                 // Add some extra to cover gas and future transactions
                 mintAmount = mintAmount + (amount / 10); // Add 10% buffer
-                
+
                 // Try to mint tokens (will succeed if it's a mock token with mint function)
                 try IMintable(paymentToken).mint(shopper, mintAmount) {
                     console2.log("Minted", mintAmount, "tokens to shopper");
@@ -164,14 +164,14 @@ contract List is Script {
                     console2.log("Token does not support minting, assuming sufficient balance from external source");
                 }
             }
-            
+
             // Approve payment token if needed - done by the shopper (current broadcaster)
             uint256 allowance = token.allowance(shopper, address(treasury));
             if (allowance < amount) {
                 console2.log("Approving payment token as shopper...");
                 token.approve(address(treasury), amount);
                 console2.log("Approved", amount, "tokens");
-                
+
                 // Verify the approval was set
                 uint256 newAllowance = token.allowance(shopper, address(treasury));
                 console2.log("Verified allowance:", newAllowance);
@@ -181,7 +181,7 @@ contract List is Script {
 
         // Create the listing - this will transferFrom the shopper (current broadcaster)
         treasury.list(listing);
-        
+
         vm.stopBroadcast();
 
         // Save listing data for future reference
@@ -227,4 +227,3 @@ contract List is Script {
         console2.log("  Latest listing:", latestFile);
     }
 }
-

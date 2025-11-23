@@ -98,10 +98,9 @@ contract Treasury {
     bytes32 public immutable DOMAIN_SEPARATOR;
 
     /// @notice EIP-712 typehash for transferWithAuthorization
-    bytes32 public constant TRANSFER_WITH_AUTHORIZATION_TYPEHASH =
-        keccak256(
-            "TransferWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)"
-        );
+    bytes32 public constant TRANSFER_WITH_AUTHORIZATION_TYPEHASH = keccak256(
+        "TransferWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)"
+    );
 
     /**
      * @notice Initialize Treasury with EVVM contract address
@@ -125,9 +124,7 @@ contract Treasury {
         // Initialize EIP-712 domain separator
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
-                keccak256(
-                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-                ),
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
                 keccak256(bytes("Treasury")),
                 keccak256(bytes("1")),
                 block.chainid,
@@ -145,11 +142,7 @@ contract Treasury {
         depositFrom(msg.sender, token, amount);
     }
 
-    function depositFrom(
-        address depositor,
-        address token,
-        uint256 amount
-    ) public payable {
+    function depositFrom(address depositor, address token, uint256 amount) public payable {
         if (address(0) == token) {
             /// user is sending host native coin
             if (msg.value == 0) {
@@ -181,9 +174,7 @@ contract Treasury {
     }
 
     function _withdraw(address to, address token, uint256 amount) internal {
-        if (
-            token == Evvm(evvmAddress).getEvvmMetadata().principalTokenAddress
-        ) {
+        if (token == Evvm(evvmAddress).getEvvmMetadata().principalTokenAddress) {
             revert ErrorsLib.PrincipalTokenIsNotWithdrawable();
         }
 
@@ -212,97 +203,73 @@ contract Treasury {
         emit ListingCreated(listing, id);
     }
 
-    function calculateId(
-        Listing calldata listing
-    ) external pure returns (bytes32 id) {
+    function calculateId(Listing calldata listing) external pure returns (bytes32 id) {
         id = keccak256(abi.encode(listing));
     }
 
-    function createPrivateCredentials(
-        PrivateCredentialsRaw calldata rawCredentials
-    ) external pure returns (bytes32 privateCredentials) {
+    function createPrivateCredentials(PrivateCredentialsRaw calldata rawCredentials)
+        external
+        pure
+        returns (bytes32 privateCredentials)
+    {
         privateCredentials = keccak256(abi.encode(rawCredentials));
     }
 
-    function submitPurchase(
-        bytes32 id,
-        bytes calldata purchaseData,
-        bytes calldata seal
-    ) external {
-        // // Decode journalData from vlayer: (notaryKeyFingerprint, method, url, timestamp, queriesHash, extractedValues)
-        // // Variables are intentionally unused (validation commented out)
-        // (
-        //     bytes32 notaryKeyFingerprint,
-        //     string memory method,
-        //     string memory url,
-        //     uint256 proofTimestamp,
-        //     bytes32 queriesHash,
-        //     bytes memory extractedValues
-        // ) = abi.decode(
-        //         purchaseData,
-        //         (bytes32, string, string, uint256, bytes32, bytes)
-        //     );
-        
-        // // Suppress unused variable warnings - reference in unused expression (optimizer removes)
-        // if (false) {
-        //     keccak256(abi.encodePacked(notaryKeyFingerprint, method, url, proofTimestamp, queriesHash, extractedValues));
-        // }
+    function submitPurchase(bytes32 id, bytes calldata purchaseData, bytes calldata seal) external {
+        (
+            bytes32 notaryKeyFingerprint,
+            string memory method,
+            string memory url,
+            uint256 proofTimestamp,
+            bytes32 queriesHash,
+            bytes32 privateCredentials,
+            string memory fulfillmentStatus
+        ) = abi.decode(purchaseData, (bytes32, string, string, uint256, bytes32, bytes32, string));
 
         Listing memory listing = fetchListing[id];
-        // if (listing.shopper == address(0)) revert InvalidListing();
 
-        // // Validate notary key fingerprint
-        // if (notaryKeyFingerprint != EXPECTED_NOTARY_KEY_FINGERPRINT) {
-        //     revert InvalidNotaryKeyFingerprint();
-        // }
+        if (listing.shopper == address(0)) revert InvalidListing();
 
-        // if (privateCredentials != listing.privateCredentials)
-        //     revert WrongCredentials();
+        if (notaryKeyFingerprint != EXPECTED_NOTARY_KEY_FINGERPRINT) {
+            revert InvalidNotaryKeyFingerprint();
+        }
 
-        // // Validate URL matches the expected endpoint pattern provided at deployment
-        // // The URL may include an API key parameter, so we check if it starts with the expected pattern
-        // bytes memory urlBytes = bytes(url);
-        // bytes memory patternBytes = bytes(listing.url);
+        if (privateCredentials != listing.privateCredentials) {
+            revert WrongCredentials();
+        }
 
-        // // Validate method is GET (expected for API calls)
-        // if (
-        //     keccak256(bytes(method)) != keccak256(bytes("GET")) ||
-        //     urlBytes.length < patternBytes.length
-        // ) {
-        //     revert InvalidUrl();
-        // }
+        if (keccak256(bytes(method)) != keccak256(bytes("GET"))) {
+            revert InvalidUrl();
+        }
 
-        // // Compare the first part of the URL with the expected pattern
-        // for (uint256 i = 0; i < patternBytes.length; i++) {
-        //     if (urlBytes[i] != patternBytes[i]) {
-        //         revert InvalidUrl();
-        //     }
-        // }
+        bytes memory urlBytes = bytes(url);
+        bytes memory patternBytes = bytes(listing.url);
 
-        // // Validate queries hash
-        // if (queriesHash != EXPECTED_QUERIES_HASH) {
-        //     revert InvalidQueriesHash();
-        // }
+        if (urlBytes.length < patternBytes.length) {
+            revert InvalidUrl();
+        }
 
-        // // Validate URL equals the expected endpoint pattern provided at deployment
-        // if (keccak256(bytes(url)) != keccak256(bytes(listing.url))) {
-        //     revert InvalidUrl();
-        // }
+        for (uint256 i = 0; i < patternBytes.length; i++) {
+            if (urlBytes[i] != patternBytes[i]) {
+                revert InvalidUrl();
+            }
+        }
 
-        // Verify the ZK proof
+        if (queriesHash != EXPECTED_QUERIES_HASH) {
+            revert InvalidQueriesHash();
+        }
+
+        if (keccak256(bytes(fulfillmentStatus)) != keccak256(bytes("fulfilled"))) {
+            revert OrderWasntDelivered();
+        }
+
         try VERIFIER.verify(seal, IMAGE_ID, sha256(purchaseData)) {
-            Evvm(evvmAddress).removeAmountFromUser(
-                listing.shopper,
-                PAYMENT_TOKEN,
-                listing.amount
-            );
-            Evvm(evvmAddress).addAmountToUser(
-                msg.sender,
-                PAYMENT_TOKEN,
-                listing.amount
-            );
-            delete fetchListing[id];
+            Evvm(evvmAddress).removeAmountFromUser(listing.shopper, PAYMENT_TOKEN, listing.amount);
+            Evvm(evvmAddress).addAmountToUser(msg.sender, PAYMENT_TOKEN, listing.amount);
+
             locked[listing.shopper] -= listing.amount;
+            delete fetchListing[id];
+
             emit ListingFinalized(listing, id, msg.sender);
         } catch {
             revert ZKProofVerificationFailed();
@@ -346,21 +313,10 @@ contract Treasury {
         if (authorizationState[from][nonce]) revert AuthorizationAlreadyUsed();
 
         // Construct the message hash according to EIP-712
-        bytes32 structHash = keccak256(
-            abi.encode(
-                TRANSFER_WITH_AUTHORIZATION_TYPEHASH,
-                from,
-                to,
-                value,
-                validAfter,
-                validBefore,
-                nonce
-            )
-        );
+        bytes32 structHash =
+            keccak256(abi.encode(TRANSFER_WITH_AUTHORIZATION_TYPEHASH, from, to, value, validAfter, validBefore, nonce));
 
-        bytes32 digest = keccak256(
-            abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, structHash)
-        );
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, structHash));
 
         // Recover signer from signature
         address signer = ecrecover(digest, v, r, s);

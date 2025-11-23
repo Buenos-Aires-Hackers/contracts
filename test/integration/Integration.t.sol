@@ -87,7 +87,8 @@ contract IntegrationTest is BaseTest {
 
         // 3. Verify listing was created and balance increased
         bytes32 listingId = treasury.calculateId(listing);
-        (string memory url, string memory productId, uint256 amount, address shopper, bytes32 privateCredentials) = treasury.fetchListing(listingId);
+        (string memory url, string memory productId, uint256 amount, address shopper, bytes32 privateCredentials) =
+            treasury.fetchListing(listingId);
         assertEq(url, listing.url);
         assertEq(amount, listingAmount);
         assertEq(shopper, alice);
@@ -103,7 +104,7 @@ contract IntegrationTest is BaseTest {
         assertTrue(address(staking) != address(0));
         assertTrue(address(evvm) != address(0));
         assertTrue(address(estimator) != address(0));
-        
+
         // Verify Staking can get Evvm address
         address evvmAddr = staking.getEvvmAddress();
         assertEq(evvmAddr, address(evvm));
@@ -113,7 +114,7 @@ contract IntegrationTest is BaseTest {
         // Verify contracts are deployed
         assertTrue(address(nameService) != address(0));
         assertTrue(address(evvm) != address(0));
-        
+
         // Note: NameService registration requires complex signature flow with pre-registration
         // We verify the contracts exist and are integrated
     }
@@ -124,7 +125,7 @@ contract IntegrationTest is BaseTest {
         vm.prank(admin);
         evvm.setEvvmID(123);
         assertEq(evvm.getEvvmID(), 123);
-        
+
         // Restore original ID
         vm.prank(admin);
         evvm.setEvvmID(originalId);

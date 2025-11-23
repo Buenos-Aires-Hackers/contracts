@@ -10,25 +10,25 @@ import {NetworkConfig} from "../../script/NetworkConfig.sol";
  * @title RiscZeroTestHelper
  * @notice Helper contract for testing with RISC Zero proofs
  * @dev Extends RiscZeroCheats to provide proof generation capabilities
- * 
+ *
  * Usage:
  * 1. For tests that need real proofs, extend this contract instead of BaseTest
  * 2. Call prove() with your ELF path and input to generate a real proof
  * 3. Use the returned journal and seal in your tests
- * 
+ *
  * Example:
  * ```solidity
  * contract MyTest is RiscZeroTestHelper {
  *     function testWithRealProof() public {
  *         bytes memory input = abi.encode(...);
  *         (bytes memory journal, bytes memory seal) = prove("path/to/your/program.elf", input);
- *         
+ *
  *         // Use seal in your test
  *         treasury.submitPurchase(listingId, purchaseData, seal);
  *     }
  * }
  * ```
- * 
+ *
  * Note: This requires:
  * - Rust toolchain installed
  * - RISC Zero dependencies in lib/risc0-ethereum
@@ -79,4 +79,3 @@ abstract contract RiscZeroTestHelper is Test, RiscZeroCheats {
         getRiscZeroVerifier().verify(seal, imageId, journalHash);
     }
 }
-

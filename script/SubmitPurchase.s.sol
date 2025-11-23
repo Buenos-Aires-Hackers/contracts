@@ -31,13 +31,7 @@ contract SubmitPurchase is Script {
         require(seal.length > 0, "ZK_PROOF_SEAL not set");
 
         // Encode purchase data
-        bytes memory purchaseData = abi.encode(
-            notaryKeyFingerprint,
-            method,
-            url,
-            queriesHash,
-            privateCredentials
-        );
+        bytes memory purchaseData = abi.encode(notaryKeyFingerprint, method, url, queriesHash, privateCredentials);
 
         console2.log("Submitting purchase:");
         console2.log("  Listing ID:", vm.toString(listingId));
@@ -57,4 +51,3 @@ contract SubmitPurchase is Script {
         console2.log("Purchase submitted successfully!");
     }
 }
-

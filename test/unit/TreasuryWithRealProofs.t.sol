@@ -5,14 +5,13 @@ pragma solidity 0.8.30;
  * @title TreasuryWithRealProofs
  * @notice Tests Treasury with real RISC Zero proofs
  * @dev These tests will be skipped if the zkVM program is not compiled
- * 
+ *
  * To enable these tests:
  * 1. Compile your zkVM program to ELF format
  * 2. Update ELF_PATH to point to your compiled program
  * 3. Update YOUR_IMAGE_ID with your program's image ID
  * 4. Update RISC Zero constants in BaseTest to match your program
  */
-
 import {BaseTest} from "../helpers/BaseTest.sol";
 import {RiscZeroTestHelper} from "../helpers/RiscZeroTestHelper.sol";
 import {Treasury} from "@evvm/testnet-contracts/contracts/treasury/Treasury.sol";
@@ -29,12 +28,9 @@ contract TreasuryWithRealProofs is BaseTest, RiscZeroTestHelper {
     /// @notice Verify we're forking Base Sepolia and using the real verifier
     function test_VerifyForkAndVerifier() public {
         // Verify we're on Base Sepolia fork
-        require(
-            NetworkConfig.isBaseSepolia(block.chainid),
-            "Must be forking Base Sepolia"
-        );
+        require(NetworkConfig.isBaseSepolia(block.chainid), "Must be forking Base Sepolia");
         assertEq(block.chainid, NetworkConfig.BASE_SEPOLIA_CHAIN_ID);
-        
+
         // Verify we're using the real verifier router
         assertEq(
             address(treasury.VERIFIER()),
@@ -80,11 +76,10 @@ contract TreasuryWithRealProofs is BaseTest, RiscZeroTestHelper {
         // Your zkVM program should verify the Shopify order fulfillment and extract relevant data
         // NOTE: Update this to match your zkVM program's expected input format
         bytes memory purchaseInput = abi.encode(listing.url);
-        
+
         // Generate proof using RISC Zero FFI
-        (bytes memory journal, bytes memory seal, bytes32 journalHash) = 
-            generateProofWithHash(ELF_PATH, purchaseInput);
-        
+        (bytes memory journal, bytes memory seal, bytes32 journalHash) = generateProofWithHash(ELF_PATH, purchaseInput);
+
         // Verify proof was generated
         require(seal.length > 0, "Proof generation failed - seal is empty");
         require(journal.length > 0, "Proof generation failed - journal is empty");
@@ -102,32 +97,18 @@ contract TreasuryWithRealProofs is BaseTest, RiscZeroTestHelper {
         ) = abi.decode(journal, (bytes32, string, string, bytes32, bytes32));
 
         // Step 4: Prepare purchase data (must match Treasury's expected format)
-        bytes memory purchaseData = abi.encode(
-            notaryKeyFingerprint,
-            method,
-            url,
-            queriesHash,
-            privateCredentials
-        );
+        bytes memory purchaseData = abi.encode(notaryKeyFingerprint, method, url, queriesHash, privateCredentials);
 
         // Verify the journal hash matches what we'll pass to verify()
         bytes32 expectedJournalHash = sha256(purchaseData);
         assertEq(expectedJournalHash, journalHash, "Journal hash mismatch");
-        
+
         // Verify the image ID matches
         assertEq(treasury.IMAGE_ID(), YOUR_IMAGE_ID, "Image ID mismatch");
-        
+
         // Verify notary fingerprint and queries hash match Treasury expectations
-        assertEq(
-            notaryKeyFingerprint,
-            treasury.EXPECTED_NOTARY_KEY_FINGERPRINT(),
-            "Notary fingerprint mismatch"
-        );
-        assertEq(
-            queriesHash,
-            treasury.EXPECTED_QUERIES_HASH(),
-            "Queries hash mismatch"
-        );
+        assertEq(notaryKeyFingerprint, treasury.EXPECTED_NOTARY_KEY_FINGERPRINT(), "Notary fingerprint mismatch");
+        assertEq(queriesHash, treasury.EXPECTED_QUERIES_HASH(), "Queries hash mismatch");
 
         // Step 5: Submit the purchase with real proof
         uint256 merchantBalanceBefore = evvm.getBalance(merchant, address(usdc));
@@ -141,7 +122,7 @@ contract TreasuryWithRealProofs is BaseTest, RiscZeroTestHelper {
         assertEq(evvm.getBalance(merchant, address(usdc)), merchantBalanceBefore + listingAmount);
 
         // Verify listing was deleted
-        (, , , address shopper, ) = treasury.fetchListing(listingId);
+        (,,, address shopper,) = treasury.fetchListing(listingId);
         assertEq(shopper, address(0));
     }
 
@@ -149,16 +130,17 @@ contract TreasuryWithRealProofs is BaseTest, RiscZeroTestHelper {
      * @notice Helper function to generate a proof for a purchase
      * @dev This should match your zkVM program's expected input format
      */
-    function generatePurchaseProof(
-        string memory shopifyUrl
-    ) internal returns (bytes memory purchaseData, bytes memory seal) {
+    function generatePurchaseProof(string memory shopifyUrl)
+        internal
+        returns (bytes memory purchaseData, bytes memory seal)
+    {
         // Prepare input for your zkVM program
         // NOTE: Update this to match your zkVM program's expected input
         bytes memory input = abi.encode(shopifyUrl);
 
         // Generate proof
         (bytes memory journal, bytes memory sealGenerated) = generateProof(ELF_PATH, input);
-        
+
         // Decode journal to get purchase data
         // Treasury expects: (bytes32, string, string, bytes32, bytes32)
         (
@@ -171,8 +153,7 @@ contract TreasuryWithRealProofs is BaseTest, RiscZeroTestHelper {
 
         // Re-encode as purchaseData for Treasury
         purchaseData = abi.encode(notaryKeyFingerprint, method, url, queriesHash, privateCredentials);
-        
+
         return (purchaseData, sealGenerated);
     }
 }
-

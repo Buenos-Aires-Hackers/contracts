@@ -31,7 +31,7 @@ abstract contract BaseTest is Test {
     // Mock contracts
     MockUSDC public usdc;
     MockERC20 public dai;
-    
+
     // RISC Zero verifier (real contract on Base Sepolia)
     IRiscZeroVerifier public riscZeroVerifier;
 
@@ -55,7 +55,7 @@ abstract contract BaseTest is Test {
     // Constants
     uint256 public constant INITIAL_BALANCE = 1000 ether;
     uint256 public constant PRINCIPAL_TOKEN_SUPPLY = 1_000_000_000 ether;
-    
+
     // RISC Zero configuration constants (these should match your actual ZK proof program)
     // These are placeholder values - replace with actual values from your ZK proof setup
     bytes32 public constant RISC0_IMAGE_ID = bytes32(uint256(1)); // TODO: Replace with actual image ID
@@ -65,16 +65,13 @@ abstract contract BaseTest is Test {
     function setUp() public virtual {
         // Fork Base Sepolia for testing
         vm.createSelectFork(NetworkConfig.BASE_SEPOLIA_RPC_URL);
-        
+
         // Verify we're on Base Sepolia
-        require(
-            NetworkConfig.isBaseSepolia(block.chainid),
-            "BaseTest: Must run tests on Base Sepolia fork"
-        );
-        
+        require(NetworkConfig.isBaseSepolia(block.chainid), "BaseTest: Must run tests on Base Sepolia fork");
+
         // Get the real RISC Zero verifier router from Base Sepolia
         riscZeroVerifier = NetworkConfig.getRiscZeroVerifier();
-        
+
         // Setup test accounts with specific addresses to avoid collisions
         admin = address(0x1234567890123456789012345678901234567890);
         activator = address(0x2345678901234567890123456789012345678901);
@@ -222,21 +219,10 @@ abstract contract BaseTest is Test {
             "TransferWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)"
         );
 
-        bytes32 structHash = keccak256(
-            abi.encode(
-                TRANSFER_WITH_AUTHORIZATION_TYPEHASH,
-                from,
-                to,
-                value,
-                validAfter,
-                validBefore,
-                nonce
-            )
-        );
+        bytes32 structHash =
+            keccak256(abi.encode(TRANSFER_WITH_AUTHORIZATION_TYPEHASH, from, to, value, validAfter, validBefore, nonce));
 
-        bytes32 digest = keccak256(
-            abi.encodePacked("\x19\x01", treasury.DOMAIN_SEPARATOR(), structHash)
-        );
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", treasury.DOMAIN_SEPARATOR(), structHash));
 
         (v, r, s) = vm.sign(privateKey, digest);
     }
